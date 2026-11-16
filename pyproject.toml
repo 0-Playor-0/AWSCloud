@@ -1,6 +1,7 @@
 [project]
 name = "namma-check"
 version = "0.1.0"
+license = "MIT"
 requires-python = ">=3.14"
 # Runtime deps of the Lambda (engine + backend). Keep in sync with backend/requirements.txt.
 dependencies = [

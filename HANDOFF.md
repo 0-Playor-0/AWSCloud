@@ -158,11 +158,11 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 ## 5. Reliability and cost control
 
-- API Gateway route throttling: start at 2 requests/s, burst 5 (tune and report).
-- Lambda: reserved concurrency 5, timeout 20 s, memory 512 MB (tune and report).
+- API Gateway route throttling: 10 requests/s, burst 20 (tuned from 2/5 after Phase 5; report changes).
+- Lambda: reserved concurrency 10 (account limit 400), timeout 20 s, memory 512 MB (tune and report).
 - Daily extraction cap in DynamoDB (`EXTRACT_DAILY_CAP`, default 300) applies only to the metered `bedrock` extractor; `client_ocr` makes no paid call and is bounded by throttling. When reached: `429 daily_cap_reached`; the frontend switches to typed mode automatically. `/v1/compare` is never capped beyond throttling (it costs almost nothing).
 - Input validation: content-type, base64 validity, JPEG magic bytes, decoded size, pixel dimensions, field lengths, date formats, 2–6 documents.
-- Frontend: OCR assets (~7 MB) load only when photo mode is used, after a notice ("about 7 MB, one time") with download progress and a typed-mode alternative; they live under a versioned path `/ocr/<versions>/` and are served with a one-year immutable cache header; retry once on 502; clear messages for every error code; works on slow 4G.
+- Frontend: one automatic retry after a short backoff (~0.8–1.2 s) on 503 or a throttled 429 before showing the message (daily_cap_reached is never retried); OCR assets (~7 MB) load only when photo mode is used, after a notice ("about 7 MB, one time") with download progress and a typed-mode alternative; they live under a versioned path `/ocr/<versions>/` and are served with a one-year immutable cache header; retry once on 502 for /v1/extract; clear messages for every error code; works on slow 4G.
 - Budgets: AWS Budgets alerts at $10, $25, $50 actual spend (email supplied by the human). CloudWatch alarm on Lambda errors and on 5xx rate.
 - Graceful degradation order: on-device OCR (Bedrock only if ever enabled) → typed mode → sample mode. The site must remain useful at every level.
 

@@ -84,7 +84,8 @@ Needs an AWS account, the AWS CLI and SAM CLI, and credentials for an IAM user (
    ```bash
    sam build && sam deploy --parameter-overrides GitSha=$(git rev-parse --short HEAD) AlarmEmail=you@example.com
    ```
-   If `scripts/preflight.sh` shows a Lambda concurrency limit of 100 or less, add
+   Pass `AlarmEmail` on every deploy: leaving it out removes the alarm topic. If
+   `scripts/preflight.sh` shows a Lambda concurrency limit of 100 or less, add
    `ReservedConcurrency=0`.
 4. Build and publish the site:
    ```bash
@@ -99,10 +100,12 @@ Needs an AWS account, the AWS CLI and SAM CLI, and credentials for an IAM user (
    cd frontend && E2E_BASE_URL=<SiteUrl> E2E_API_URL=<ApiUrl> npm run e2e
    ```
 
-Cost is bounded by API throttling (2 requests/s), Lambda reserved concurrency (5), CloudFront
+Cost is bounded by API throttling (10 requests/s, burst 20), Lambda reserved concurrency (10), CloudFront
 caching and the absence of any paid per-request AI service; budget alerts email you at $10, $25
 and $50.
 
 ## License
 
-No license file yet; all rights reserved until one is added.
+MIT, see [LICENSE](LICENSE). Third-party software, the OCR model and fonts keep their own
+licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (regenerate with
+`.venv/bin/python scripts/third_party_notices.py` after `sam build`).

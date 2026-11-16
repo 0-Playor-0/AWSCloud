@@ -7,7 +7,7 @@ AWS in Sydney and not stored.
 
 | Piece | Service | Why |
 |---|---|---|
-| API | API Gateway HTTP API | Cheapest managed HTTPS front door; route throttling (2 rps, burst 5) bounds cost |
+| API | API Gateway HTTP API | Cheapest managed HTTPS front door; route throttling (10 rps, burst 20) bounds cost |
 | Logic | One Lambda (Python 3.14, Powertools, pydantic) | Pay per request; parsers, ID guard and comparison engine in one function |
 | Counters | DynamoDB on-demand table `nc_counters` | Anonymous aggregate counts only; daily cap for a future metered extractor |
 | Logs | CloudWatch Logs (14-day retention) | Metadata only: request id, route, doc_type, status, latency, extractor, error code |
@@ -19,8 +19,9 @@ AWS in Sydney and not stored.
 
 ## Cost controls
 
-- API Gateway throttling: 2 requests/s, burst 5 (bare `429` beyond that).
-- Lambda reserved concurrency 5, 512 MB, 20 s timeout (extra load gets `503`, shown as "try again").
+- API Gateway throttling: 10 requests/s, burst 20 (bare `429` beyond that).
+- Lambda reserved concurrency 10, 512 MB, 20 s timeout (extra load gets `503`). The site retries a
+  `503` or throttled `429` once after a short backoff before showing "try again".
 - No paid per-request AI service: OCR runs on the phone. The daily cap stays wired for a future
   metered extractor (Bedrock, off).
 - CloudFront caches hashed assets and the versioned OCR files for a year, so repeat visits cost

@@ -43,7 +43,7 @@ cors_allows() { curl -s -o /dev/null -D - -X OPTIONS "$API/v1/compare" -H "Origi
 if cors_allows "$SITE"; then echo "cors_site_allowed          PASS"; else echo "cors_site_allowed          FAIL"; FAILS=$((FAILS + 1)); fi
 if cors_allows "https://evil.example"; then echo "cors_other_rejected        FAIL"; FAILS=$((FAILS + 1)); else echo "cors_other_rejected        PASS"; fi
 
-echo "--- throttling burst (expect some 429s) ---"
-for _ in $(seq 1 15); do curl -s -o /dev/null -w '%{http_code} ' "$API/v1/health" & done; wait; echo
+echo "--- throttling burst of 60 (limit 10/s, burst 20: expect some 429s) ---"
+for _ in $(seq 1 60); do curl -s -o /dev/null -w '%{http_code} ' "$API/v1/health" & done; wait; echo
 echo "--- daily_cap_reached / extractor_failed: bedrock mode only (not built); covered by integration tests ---"
 echo "FAILURES: $FAILS"

@@ -5,6 +5,8 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorB
 
 const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const TIMEOUT_MS = 30_000;
+/** One automatic retry after this pause (plus up to 50% jitter) on a busy reply (HANDOFF.md 5). */
+export const RETRY_BACKOFF_MS = 800;
 
 function isErrorBody(x: unknown): x is { error: ApiErrorBody } {
   const e = (x as { error?: Record<string, unknown> } | null)?.error;
@@ -52,6 +54,27 @@ async function request<T>(path: string, init: RequestInit, valid: (b: unknown) =
   return classify<T>(res.status, body, valid);
 }
 
+/**
+ * Busy replies worth one quiet retry: 503 (Lambda at its concurrency limit) and a throttled 429
+ * (bare from API Gateway or in contract shape). Never daily_cap_reached, which is also a 429.
+ * /v1/extract also retries a 502 (extractor_failed) once.
+ */
+export function isRetryable(r: ApiResult<unknown>, alsoRetry502 = false): boolean {
+  if (r.ok) return false;
+  return r.status === 503 || r.error.code === "throttled" || (alsoRetry502 && r.status === 502);
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function requestWithRetry<T>(
+  path: string, init: RequestInit, valid: (b: unknown) => boolean, alsoRetry502 = false,
+): Promise<ApiResult<T>> {
+  const first = await request<T>(path, init, valid);
+  if (!isRetryable(first, alsoRetry502)) return first;
+  await pause(RETRY_BACKOFF_MS * (1 + Math.random() * 0.5));
+  return request<T>(path, init, valid);
+}
+
 function postJson(body: unknown): RequestInit {
   return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
 }
@@ -61,7 +84,7 @@ const validExtract = (b: unknown) => isObj(b) && isObj(b.fields) && Array.isArra
 const validCompare = (b: unknown) =>
   isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan);
 
-/** POST /v1/extract with on-device OCR text only; retries once on 502 (HANDOFF.md section 5). */
+/** POST /v1/extract with on-device OCR text only; one retry on 502, 503 or throttled. */
 export async function extract(docType: DocType, lines: OcrLine[]): Promise<ApiResult<ExtractResponse>> {
   const confidence = lines.map((l) => l.confidence);
   const init = postJson({
@@ -70,9 +93,7 @@ export async function extract(docType: DocType, lines: OcrLine[]): Promise<ApiRe
     // only when every line has one (contract: same length as ocr_lines)
     ...(confidence.every((c) => c !== null) ? { ocr_confidence: confidence.map((c) => Math.round(c * 100) / 100) } : {}),
   });
-  const first = await request<ExtractResponse>("/v1/extract", init, validExtract);
-  if (first.ok || first.status !== 502) return first;
-  return request<ExtractResponse>("/v1/extract", init, validExtract);
+  return requestWithRetry<ExtractResponse>("/v1/extract", init, validExtract, true);
 }
 
 export function compare(purpose: Purpose, docs: DocumentEntry[], anchor: Anchor | null): Promise<ApiResult<CompareResponse>> {
@@ -81,7 +102,7 @@ export function compare(purpose: Purpose, docs: DocumentEntry[], anchor: Anchor 
     documents: docs.map((d) => ({ doc_type: d.doc_type, fields: d.fields })),
     ...(anchor && Object.values(anchor).some(Boolean) ? { anchor } : {}),
   };
-  return request<CompareResponse>("/v1/compare", postJson(body), validCompare);
+  return requestWithRetry<CompareResponse>("/v1/compare", postJson(body), validCompare);
 }
 
 export interface Stats {
@@ -90,5 +111,5 @@ export interface Stats {
 }
 
 export function stats(): Promise<ApiResult<Stats>> {
-  return request<Stats>("/v1/stats", { method: "GET" }, (b) => isObj(b) && typeof b.checks === "number");
+  return requestWithRetry<Stats>("/v1/stats", { method: "GET" }, (b) => isObj(b) && typeof b.checks === "number");
 }

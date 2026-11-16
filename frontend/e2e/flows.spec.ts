@@ -218,3 +218,22 @@ test("report is a receipt with character-level differences", async ({ page }) =>
   await expect(receipt).toContainText("General check");
   await expect(receipt.locator("mark.diff-mark").first()).toBeVisible();
 });
+
+for (const [name, status, body] of [
+  ["503", 503, "<html>Service Unavailable</html>"],
+  ["bare 429", 429, '{"message":"Too Many Requests"}'],
+] as const) {
+  test(`busy ${name} once is retried quietly`, async ({ page }) => {
+    let calls = 0;
+    await page.route("**/v1/compare", (r) => {
+      calls += 1;
+      return calls === 1 ? r.fulfill({ status, body, contentType: "application/json" }) : r.continue();
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Load Arjun's sample set" }).click();
+    await check(page);
+    await expect(page.getByTestId("report-status")).toHaveText("Small differences only");
+    await expect(page.locator("[data-error-code]")).toHaveCount(0);
+    expect(calls).toBe(2);
+  });
+}
