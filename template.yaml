@@ -21,10 +21,14 @@ Parameters:
     Default: 5
     MinValue: 0
     Description: Lambda reserved concurrency. 0 = do not reserve (needed on accounts whose concurrency limit is too low to reserve any).
-  AllowedOrigins:
-    Type: CommaDelimitedList
-    Default: http://localhost:5173
-    Description: CORS origins. Phase 5 adds the CloudFront origin.
+  DevOrigin:
+    Type: String
+    Default: ""
+    Description: Optional extra CORS origin for local testing against the deployed API (e.g. http://localhost:5173). Empty in production, so CORS allows only the CloudFront origin.
+  AlarmEmail:
+    Type: String
+    Default: ""
+    Description: Email for alarm notifications (passed at deploy time; never stored in the repo). Empty = alarms without notifications.
   ThrottleRate:
     Type: Number
     Default: 2
@@ -34,6 +38,8 @@ Parameters:
 
 Conditions:
   ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
+  HasDevOrigin: !Not [!Equals [!Ref DevOrigin, ""]]
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, ""]]
 
 Rules:
   SingleRegion:
@@ -64,7 +70,10 @@ Resources:
         ThrottlingRateLimit: !Ref ThrottleRate
         ThrottlingBurstLimit: !Ref ThrottleBurst
       CorsConfiguration:
-        AllowOrigins: !Ref AllowedOrigins
+        AllowOrigins: !If
+          - HasDevOrigin
+          - [!Sub "https://${SiteDistribution.DomainName}", !Ref DevOrigin]
+          - [!Sub "https://${SiteDistribution.DomainName}"]
         AllowMethods: [GET, POST, OPTIONS]
         AllowHeaders: [content-type]
         MaxAge: 600
@@ -125,7 +134,207 @@ Resources:
     Properties:
       RetentionInDays: 14
 
+  # --- Static site: private S3 bucket behind CloudFront (Origin Access Control) ----------------
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+          - Sid: HttpsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource: [!GetAtt SiteBucket.Arn, !Sub "${SiteBucket.Arn}/*"]
+            Condition: {Bool: {aws:SecureTransport: "false"}}
+
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-site"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "${AWS::StackName}-security-headers"
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            Override: true
+            # The API is reached directly (wildcard host avoids a template cycle); OCR runs as a
+            # same-origin worker that compiles WebAssembly. No third-party hosts at all.
+            ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self' https://*.execute-api.${AWS::Region}.amazonaws.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'"
+          ContentTypeOptions: {Override: true}
+          FrameOptions: {FrameOption: DENY, Override: true}
+          ReferrerPolicy: {ReferrerPolicy: no-referrer, Override: true}
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+        CustomHeadersConfig:
+          Items:
+            - Header: Permissions-Policy
+              Value: "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+              Override: true
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Namma Check static site
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200  # includes edge locations in India, where the users are
+        Origins:
+          - Id: site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOriginAccessControl.Id
+            S3OriginConfig: {OriginAccessIdentity: ""}
+        DefaultCacheBehavior:
+          TargetOriginId: site
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # managed CachingOptimized (honours Cache-Control)
+          ResponseHeadersPolicyId: !Ref SiteHeaders
+
+  # --- Alarms (metadata only) --------------------------------------------------------------------
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Condition: HasAlarmEmail
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+  LambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Lambda errors (unhandled exceptions or timeouts) in 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref ApiFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
+
+  LambdaThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Lambda throttled by reserved concurrency (users see "try again").
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions: [{Name: FunctionName, Value: !Ref ApiFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 20
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
+
+  Api5xxRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: More than 20% of API responses were 5xx over 5 minutes (at least 10 requests).
+      Metrics:
+        - Id: errors
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApiGateway
+              MetricName: 5xx
+              Dimensions: [{Name: ApiId, Value: !Ref HttpApi}, {Name: Stage, Value: $default}]
+            Period: 300
+            Stat: Sum
+        - Id: requests
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/ApiGateway
+              MetricName: Count
+              Dimensions: [{Name: ApiId, Value: !Ref HttpApi}, {Name: Stage, Value: $default}]
+            Period: 300
+            Stat: Sum
+        - Id: rate
+          Expression: IF(requests >= 10, errors / requests, 0)
+          Label: 5xx rate
+          ReturnData: true
+      EvaluationPeriods: 1
+      Threshold: 0.2
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
+
+  CounterUnavailableFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref FunctionLogs
+      FilterPattern: '{ $.error_code = "counter_unavailable" }'
+      MetricTransformations:
+        - MetricNamespace: NammaCheck
+          MetricName: CounterUnavailable
+          MetricValue: "1"
+          DefaultValue: 0
+
+  CounterUnavailableAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The DynamoDB counter store failed (stats are best effort; a cap would fail closed).
+      Namespace: NammaCheck
+      MetricName: CounterUnavailable
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
+
 Outputs:
   ApiUrl:
     Description: Base URL of the API
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  SiteUrl:
+    Description: Public URL of the site
+    Value: !Sub "https://${SiteDistribution.DomainName}"
+  SiteBucketName:
+    Description: Private bucket that holds the built site (scripts/deploy_site.sh)
+    Value: !Ref SiteBucket
+  DistributionId:
+    Description: CloudFront distribution (for cache invalidation)
+    Value: !Ref SiteDistribution
