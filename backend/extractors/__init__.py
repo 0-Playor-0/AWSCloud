@@ -2,8 +2,8 @@
 
 - client_ocr (default): the browser runs OCR on the cropped photo and sends only text lines;
   the server parses them. No AWS call, so no daily cap.
-- bedrock (off; future, in-region only): not built. It would be `metered`, so the daily cap
-  applies to it.
+- bedrock (off; future, same region only, no cross-region profiles): not built. It would be
+  `metered`, so the daily cap applies to it.
 """
 
 from __future__ import annotations

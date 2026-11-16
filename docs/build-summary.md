@@ -1,6 +1,9 @@
 # Build summary
 
-Services used and why. Region: ap-south-1 (Mumbai) for everything.
+Services used and why. Region: ap-southeast-2 (Sydney) for everything; it is configured once in
+`samconfig.toml`. The account is a "new experience" project pinned to this region by a control
+policy. Photos never leave the phone; the text and typed details that are sent are processed on
+AWS in Sydney and not stored.
 
 | Piece | Service | Why |
 |---|---|---|
@@ -25,6 +28,6 @@ Phases 0–3 used Amazon Textract `DetectDocumentText` on an uploaded crop. It w
 
 Consequences: no Textract IAM permission, no image handling on the server, no image error
 codes, no daily cap for the default extractor (`client_ocr` costs nothing per call; throttling
-still applies). `bedrock` stays a documented future option, off, in-region only.
+still applies). `bedrock` stays a documented future option, off, same region only.
 
 Rule: never create an AWS Organization or enable IAM Identity Center for this project.

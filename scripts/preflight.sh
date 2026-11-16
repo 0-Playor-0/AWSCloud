@@ -4,7 +4,7 @@
 #   scripts/preflight.sh                            # checks only
 # Output is safe to paste back: the account ID is masked, nothing secret is printed.
 set -uo pipefail
-export AWS_REGION=ap-south-1 AWS_DEFAULT_REGION=ap-south-1 AWS_PAGER=""
+source "$(dirname "$0")/region.sh"; export AWS_PAGER=""
 EMAIL="${1:-}"
 mask() { sed -E 's/[0-9]{12}/<account>/g'; }
 exec > >(mask) 2>&1  # mask the account ID in errors too
@@ -24,12 +24,12 @@ fi
 section "Lambda concurrency (reserved concurrency needs headroom)"
 aws lambda get-account-settings --query 'AccountLimit.{ConcurrentExecutions:ConcurrentExecutions,Unreserved:UnreservedConcurrentExecutions}' --output json
 
-section "Bedrock: models with image input callable on demand in ap-south-1"
+section "Bedrock (information only; stays off): models with image input in $REGION"
 aws bedrock list-foundation-models --by-inference-type ON_DEMAND \
   --query 'modelSummaries[?contains(inputModalities, `IMAGE`)].[modelId,modelLifecycle.status]' \
   --output text || echo "BEDROCK LIST: FAILED"
 
-section "Bedrock: inference profiles visible in ap-south-1"
+section "Bedrock (information only): inference profiles visible in $REGION"
 aws bedrock list-inference-profiles --query 'inferenceProfileSummaries[].[inferenceProfileId,status]' \
   --output text || echo "PROFILES: FAILED"
 

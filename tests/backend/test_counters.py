@@ -13,7 +13,7 @@ NOW = datetime(2026, 11, 16, 20, 0, tzinfo=UTC)  # 01:30 IST on 17 Nov
 
 @pytest.fixture
 def ddb():
-    client = boto3.client("dynamodb", region_name="ap-south-1",
+    client = boto3.client("dynamodb", region_name="ap-southeast-2",
                           aws_access_key_id="x", aws_secret_access_key="x")
     with Stubber(client) as stub:
         yield client, stub

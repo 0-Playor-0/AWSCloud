@@ -1,8 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Namma Check API. Region ap-south-1 only.
+Description: Namma Check. One region only (DeployRegion).
 
 Parameters:
+  DeployRegion:
+    Type: String
+    Default: ap-southeast-2
+    Description: The only region this stack may be deployed to (must match samconfig.toml).
   GitSha:
     Type: String
     Default: dev
@@ -32,10 +36,10 @@ Conditions:
   ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
 
 Rules:
-  MumbaiOnly:
+  SingleRegion:
     Assertions:
-      - Assert: !Equals [!Ref "AWS::Region", ap-south-1]
-        AssertDescription: Deploy to ap-south-1 only.
+      - Assert: !Equals [!Ref "AWS::Region", !Ref DeployRegion]
+        AssertDescription: Deploy only to DeployRegion (ap-southeast-2; the account allows no other).
 
 Resources:
   CountersTable:

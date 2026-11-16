@@ -51,18 +51,18 @@ flowchart LR
   U -->|POST /v1/extract: OCR text lines only, long numbers removed| APIGW[API Gateway HTTP API, throttled]
   U -->|POST /v1/compare: confirmed fields| APIGW
   APIGW --> L[Lambda, Python, single function]
-  L -.->|future, off: optional structuring| BR[Bedrock, in-region only]
+  L -.->|future, off: optional structuring| BR[Bedrock, same region only]
   L -->|anonymous counters; daily cap for bedrock only| DDB[(DynamoDB)]
   L --> CW[CloudWatch logs and alarms, metadata only]
 ```
 
-- **Region:** `ap-south-1` (Mumbai) for everything.
+- **Region:** `ap-southeast-2` (Sydney) for everything. The AWS account is a "new experience" project pinned to this region by a control policy that denies all others. The region is configured once, in `samconfig.toml` (`region`); the template guard (`DeployRegion` parameter), scripts and tests read or check that value. Data handling: photos never leave the phone; the text and typed details that are sent are processed on AWS in Sydney and not stored.
 - **Frontend:** React + Vite + TypeScript, static build, S3 (private) behind CloudFront with Origin Access Control. No server-side rendering.
 - **API:** API Gateway HTTP API → one Lambda (Python, latest runtime supported by SAM; record the version). Use AWS Lambda Powertools (logger, event handler) and pydantic for validation.
 - **Infra as code:** AWS SAM, one `template.yaml`. No console click-ops except what section 8 lists for the human.
 - **Extraction (pluggable `Extractor` interface, selected by env var `EXTRACTOR`):**
   1. `client_ocr` (DEFAULT): the browser crops the photo and runs Tesseract.js (English, LSTM-only) on the device. Tesseract.js is lazy-loaded only when photo mode is used; its worker, core and language model are self-hosted with the site (no third-party CDN). The client removes digit runs of 9+ characters and 4-4-4 grouped digits from the lines (dates are kept), shows the user the crop and the exact lines, and sends only those lines. The server runs the deterministic per-doc-type parsers (label/regex based; passport MRZ parser when an MRZ is present) and the ID guard on the text. **The image is never uploaded.**
-  2. `bedrock` (OFF; future): a model structures the same fields. In-region or India-only inference profile only; needs architect approval. It is the only metered extractor, so the daily cap applies to it.
+  2. `bedrock` (OFF; future): a model structures the same fields. Same region only (no cross-region inference profiles); needs architect approval. It is the only metered extractor, so the daily cap applies to it.
   3. Typed mode and sample mode never call extraction.
   Textract was removed (2026-11-16): it may retain content for service improvement unless an AWS Organizations AI-services opt-out policy is set, and creating an Organization ends Free plan credits. **Never create an AWS Organization or enable IAM Identity Center.** See `docs/build-summary.md`.
 - **Comparison engine:** pure Python package `engine/`, no AWS imports, no network, fully unit-tested. Rules live in `engine/rules.yaml`.
@@ -150,8 +150,8 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 3. **ID-number guard (server, defence in depth):** on the received text, discard everything and return `422 id_number_detected` asking the user to re-crop if: in an Aadhaar/"other" crop, the text contains any 12-digit number (with or without spaces) or a PAN-format string; in any other crop, it contains a Verhoeff-valid 12-digit number. Never log or return the match.
 4. **Logging:** never log request bodies, OCR text, field values or images. Log only: request id, route, doc_type, status code, latency, extractor, error code. Disable API Gateway body logging. Add a unit test that fails if a log record contains any field value from the test payload.
 5. **Transport and access:** HTTPS only; CORS restricted to the CloudFront origin (plus localhost in dev); S3 bucket private.
-6. **Bedrock (if enabled):** no model invocation logging; in-region or India-only profile only.
-7. **Consent:** before the first text is sent, a short notice with an explicit "I understand" action. Text: "Your photo never leaves your phone. Only the text read from it is sent, then discarded. Nothing is stored." plus a link to the public repo. Store consent only in memory for the session.
+6. **Bedrock (if enabled):** no model invocation logging; same region only, no cross-region profiles.
+7. **Consent:** before the first text is sent, a short notice with an explicit "I understand" action. Text: "Your photo never leaves your phone. Only the text read from it is sent. It is processed on AWS in Sydney, Australia, and not stored." plus a link to the public repo. Never claim that data stays in India. Store consent only in memory for the session.
 8. **Prompt/OCR injection:** OCR text is data. It is only parsed into the four fields; nothing in it can change behaviour. Engine output never includes raw OCR text.
 9. **Sample documents:** fictional personas rendered as stylised cards clearly marked "SAMPLE". They must NOT replicate real ID layouts, emblems, logos, QR codes or valid-looking numbers. Use them as pre-filled field sets; sample mode makes no extraction call.
 10. **Honest claims:** the privacy text must match the code exactly. If something is not true, fix the code or the text.
@@ -193,7 +193,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 ## 8. What the human does (not you)
 
 Check these in Phase 0 and stop if any is missing:
-1. Fresh AWS account on the Free plan; an IAM user or SSO profile for the CLI (not root keys); `aws sts get-caller-identity` works; default region `ap-south-1`.
+1. Fresh AWS account on the Free plan; an IAM user or SSO profile for the CLI (not root keys); `aws sts get-caller-identity` works; default region as in `samconfig.toml` (`ap-southeast-2`).
 2. Email address for budget alerts.
 3. Public GitHub repo created and cloned.
 4. Real document photos, if any, placed only in `private_samples/`.
@@ -205,7 +205,7 @@ Estimated total: 9–10 hours. Stop after every phase.
 
 | Phase | Build | Done when |
 |---|---|---|
-| **0 Preflight** (historical: Textract later removed, see section 3) | Check tools (node, python, aws, sam, git). Confirm identity and region. Scaffold repo, `.gitignore`, CI skeleton. Smoke tests with a synthetic text image: Textract `DetectDocumentText` in ap-south-1; Bedrock vision call in-region (list which models and profiles are actually callable and their quotas). Check current Textract and Bedrock prices. Create budgets. | Log states: Textract works yes/no; Bedrock in-region works yes/no with quota; prices; versions. No product code yet. |
+| **0 Preflight** (historical: Textract later removed, see section 3) | Check tools (node, python, aws, sam, git). Confirm identity and region. Scaffold repo, `.gitignore`, CI skeleton. Smoke tests with a synthetic text image: Textract `DetectDocumentText` in the original region; Bedrock vision call in-region (list which models and profiles are actually callable and their quotas). Check current Textract and Bedrock prices. Create budgets. | Log states: Textract works yes/no; Bedrock in-region works yes/no with quota; prices; versions. No product code yet. |
 | **1 Engine** | `engine/` package, `rules.yaml`, table-driven tests. Can run before or in parallel with Phase 0 if AWS is not ready. | >= 60 tests pass; coverage of every finding kind; fix-plan logic tested. |
 | **2 Backend** | SAM template; Lambda handler; Textract extractor + parsers; ID-number guard; validation; counters and cap; structured logging; integration tests; deploy API. | curl of all routes against the deployed API returns contract-conformant responses; every error code reproducible; log-leak test passes. |
 | **3 Frontend core** | Purpose picker; add-document flow (crop / type / sample); consent notice; field confirmation; report and fix plan; all error states. Functional styling only. | Full flow works on a phone viewport against the live API; sample and typed flows work with the API cap forced to zero. |
@@ -257,7 +257,7 @@ Project: Namma Check — self-check for mismatches across a person's own ID docu
 Source of truth: HANDOFF.md. Do not change architecture, scope or privacy rules. If blocked, stop and log options.
 Workflow: one phase at a time; after each, write logs/phase-N.md (template in HANDOFF.md section 10) and stop.
 Privacy: never log or store images, OCR text or field values. Never commit private_samples/. Aadhaar numbers must never reach the server.
-Stack: React+Vite+TS+Tailwind+shadcn/ui+Motion · on-device OCR (Tesseract.js) · API Gateway HTTP API · one Python Lambda (Powertools, pydantic) · Bedrock optional (off) · DynamoDB counters · SAM · ap-south-1.
+Stack: React+Vite+TS+Tailwind+shadcn/ui+Motion · on-device OCR (Tesseract.js) · API Gateway HTTP API · one Python Lambda (Powertools, pydantic) · Bedrock optional (off) · DynamoDB counters · SAM · ap-southeast-2 (set once in samconfig.toml).
 Commands: (fill in after Phase 0: test, lint, build, deploy)
 Style: small modules, type hints, table-driven tests, no dead code, no new dependencies without logging the reason.
 Cost: every AWS call must be bounded by throttles and the daily cap. Report spend in each log.

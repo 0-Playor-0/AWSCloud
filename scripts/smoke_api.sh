@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Curl every route and every reproducible error code against a deployed API.
-#   scripts/smoke_api.sh https://<api-id>.execute-api.ap-south-1.amazonaws.com
+#   scripts/smoke_api.sh https://<api-id>.execute-api.<region>.amazonaws.com
 # Prints status + body for each case (synthetic data only), then PASS/FAIL per case.
 set -uo pipefail
 API="${1:?usage: scripts/smoke_api.sh <ApiUrl>}"

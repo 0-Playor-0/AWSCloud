@@ -68,7 +68,7 @@ class Deps:
             import boto3
 
             self._counters = DynamoCounters(
-                boto3.client("dynamodb", region_name="ap-south-1"), self.settings.table
+                boto3.client("dynamodb"), self.settings.table  # region from the Lambda runtime
             )
         return self._counters
 

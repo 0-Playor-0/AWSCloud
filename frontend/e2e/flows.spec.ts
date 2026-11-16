@@ -46,7 +46,7 @@ test("photo flow: on-device OCR, numbers stripped, consent, text only sent", asy
 
   await page.getByRole("button", { name: "Send this text" }).click();
   const dialog = page.getByRole("dialog", { name: "Before you send" });
-  await expect(dialog).toContainText("Your photo never leaves your phone. Only the text read from it is sent, then discarded. Nothing is stored.");
+  await expect(dialog).toContainText("Your photo never leaves your phone. Only the text read from it is sent. It is processed on AWS in Sydney, Australia, and not stored.");
   expect(requests.filter((r) => r.url().includes("/v1/extract"))).toHaveLength(0);
   const extractReq = page.waitForRequest("**/v1/extract");
   await dialog.getByRole("button", { name: "I understand" }).click();
