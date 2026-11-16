@@ -8,9 +8,8 @@ import json
 import pytest
 
 from backend.extractors import ExtractorError, ExtractorThrottled
-from backend.parsers import OcrLine
 
-from .conftest import jpeg_b64, make_event
+from .conftest import make_event
 
 COMPARE_BODY = {
     "purpose": "epf_claim",
@@ -22,34 +21,52 @@ COMPARE_BODY = {
     ],
     "anchor": {"name": "aadhaar", "dob": None},
 }
-AADHAAR_LINES = [OcrLine("Ravi Kumar K", 0.97), OcrLine("DOB: 14/03/2007", 0.6),
-                 OcrLine("MALE", 0.98)]
+AADHAAR_LINES = ["Ravi Kumar K", "DOB: 14/03/2007", "MALE"]
 
 
 # --- happy paths -----------------------------------------------------------------------------
 
 def test_health(fakes, call) -> None:
     status, body = call("GET", "/v1/health")
-    assert status == 200 and body == {"ok": True, "extractor": "textract", "version": "dev"}
+    assert status == 200 and body == {"ok": True, "extractor": "client_ocr", "version": "dev"}
+
+
+def _extract(call, lines: list[str] | None = None, doc_type: str = "aadhaar"):
+    body = {"doc_type": doc_type, "ocr_lines": AADHAAR_LINES if lines is None else lines}
+    return call("POST", "/v1/extract", body)
 
 
 def test_extract_contract(fakes, call) -> None:
-    counters, extractor = fakes
-    extractor.lines = AADHAAR_LINES
-    status, body = call("POST", "/v1/extract", {"doc_type": "aadhaar", "image_b64": jpeg_b64()})
+    status, body = _extract(call)
     assert status == 200
     assert body["fields"] == {
-        "name": {"value": "RAVI KUMAR K", "confidence": 0.97},
-        "dob": {"value": "2007-03-14", "confidence": 0.6, "precision": "day"},
+        "name": {"value": "RAVI KUMAR K", "confidence": 0.9},
+        "dob": {"value": "2007-03-14", "confidence": 0.9, "precision": "day"},
         "parent_name": {"value": None, "confidence": 0.0},
-        "gender": {"value": "M", "confidence": 0.98},
+        "gender": {"value": "M", "confidence": 0.9},
     }
-    assert body["warnings"] == ["dob_low_confidence"]
-    assert counters.extractions == 1
+    assert body["warnings"] == []
+    assert fakes.extractions == 0  # client_ocr is not metered: no cap, no DynamoDB call
+
+
+def test_extract_low_confidence_warning(fakes, call) -> None:
+    # A passport MRZ with a bad DOB check digit lowers that field's confidence.
+    mrz = ["P<INDKUMAR<<RAVI<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+           "Z0000000<0IND0703140M3001019<<<<<<<<<<<<<<00"]
+    status, body = _extract(call, mrz, "passport")
+    assert status == 200 and "dob_low_confidence" in body["warnings"], body
+
+
+def test_extract_client_ocr_ignores_cap(fakes, call) -> None:
+    from backend import app as app_module
+
+    app_module.deps.settings.daily_cap = 0
+    fakes.fail = True  # counter store down must not matter either
+    assert _extract(call)[0] == 200
 
 
 def test_compare_contract_and_stats(fakes, call) -> None:
-    counters, _ = fakes
+    counters = fakes
     status, body = call("POST", "/v1/compare", COMPARE_BODY)
     assert status == 200
     assert set(body) == {"summary", "findings", "fix_plan", "disclaimer"}
@@ -60,22 +77,18 @@ def test_compare_contract_and_stats(fakes, call) -> None:
 
 
 def test_compare_never_capped(fakes, call) -> None:
-    counters, _ = fakes
+    counters = fakes
     counters.cap_left = 0
     assert call("POST", "/v1/compare", COMPARE_BODY)[0] == 200
 
 
 def test_compare_survives_counter_outage(fakes, call) -> None:
-    counters, _ = fakes
+    counters = fakes
     counters.fail = True
     assert call("POST", "/v1/compare", COMPARE_BODY)[0] == 200
 
 
 # --- every error code ------------------------------------------------------------------------
-
-def _extract(call, image_b64: str | None = None, doc_type: str = "aadhaar"):
-    return call("POST", "/v1/extract", {"doc_type": doc_type, "image_b64": image_b64 or jpeg_b64()})
-
 
 def _assert_error(result, status: int, code: str) -> None:
     got_status, body = result
@@ -84,27 +97,13 @@ def _assert_error(result, status: int, code: str) -> None:
     assert body["error"]["message"] and body["error"]["hint"]
 
 
-def test_400_invalid_image(fakes, call) -> None:
-    _assert_error(_extract(call, "@@@not-base64@@@"), 400, "invalid_image")
-
-
-def test_413_image_too_large_dimensions(fakes, call) -> None:
-    _assert_error(_extract(call, jpeg_b64(1700, 400)), 413, "image_too_large")
-
-
-def test_413_image_too_large_body(fakes, call) -> None:
-    _assert_error(_extract(call, "A" * 2_300_000), 413, "image_too_large")
-
-
 def test_422_id_number_detected_discards_fields(fakes, call) -> None:
-    _, extractor = fakes
-    extractor.lines = [*AADHAAR_LINES, OcrLine("9999 9999 9999", 0.99)]
-    status, body = _extract(call)
+    status, body = _extract(call, [*AADHAAR_LINES, "9999 9999 9999"])
     _assert_error((status, body), 422, "id_number_detected")
     assert "RAVI" not in json.dumps(body)
 
 
-PASSBOOK_LINES = [OcrLine("Customer Name: RAVI KUMAR", 0.95), OcrLine("DOB: 14/03/2007", 0.9)]
+PASSBOOK_LINES = ["Customer Name: RAVI KUMAR", "DOB: 14/03/2007"]
 
 
 @pytest.mark.parametrize(
@@ -120,9 +119,7 @@ PASSBOOK_LINES = [OcrLine("Customer Name: RAVI KUMAR", 0.95), OcrLine("DOB: 14/0
 )
 def test_id_guard_by_doc_type_never_echoes_digits(fakes, call, logbuf, doc_type: str,
                                                   number: str, status: int) -> None:
-    _, extractor = fakes
-    extractor.lines = [*PASSBOOK_LINES, OcrLine(f"A/c {number}", 0.99)]
-    got_status, body = _extract(call, doc_type=doc_type)
+    got_status, body = _extract(call, [*PASSBOOK_LINES, f"A/c {number}"], doc_type)
     assert got_status == status
     if status == 422:
         assert body["error"]["code"] == "id_number_detected"
@@ -132,37 +129,41 @@ def test_id_guard_by_doc_type_never_echoes_digits(fakes, call, logbuf, doc_type:
 
 
 def test_422_unreadable(fakes, call) -> None:
-    _, extractor = fakes
-    extractor.lines = [OcrLine("~ | 12 ..", 0.3), OcrLine("--", 0.2)]
-    _assert_error(_extract(call), 422, "unreadable")
+    _assert_error(_extract(call, ["~ | 12 ..", "--"]), 422, "unreadable")
 
 
-def test_429_daily_cap_reached_skips_extractor(fakes, call) -> None:
-    counters, extractor = fakes
+def test_429_daily_cap_reached_skips_metered_extractor(metered, call) -> None:
+    counters, extractor = metered
     counters.cap_left = 0
     _assert_error(_extract(call), 429, "daily_cap_reached")
     assert extractor.calls == 0
 
 
-def test_429_cap_env_zero(fakes, call) -> None:
+def test_429_cap_env_zero_metered(metered, call) -> None:
     from backend import app as app_module
 
     app_module.deps.settings.daily_cap = 0
     _assert_error(_extract(call), 429, "daily_cap_reached")
 
 
-def test_429_throttled(fakes, call) -> None:
-    fakes[1].error = ExtractorThrottled
+def test_metered_extractor_consumes_cap(metered, call) -> None:
+    counters, extractor = metered
+    assert _extract(call)[0] == 200
+    assert counters.extractions == 1 and extractor.calls == 1
+
+
+def test_429_throttled(metered, call) -> None:
+    metered[1].error = ExtractorThrottled
     _assert_error(_extract(call), 429, "throttled")
 
 
-def test_502_extractor_failed(fakes, call) -> None:
-    fakes[1].error = ExtractorError
+def test_502_extractor_failed(metered, call) -> None:
+    metered[1].error = ExtractorError
     _assert_error(_extract(call), 502, "extractor_failed")
 
 
-def test_502_when_cap_store_down_fails_closed(fakes, call) -> None:
-    counters, extractor = fakes
+def test_502_when_cap_store_down_fails_closed(metered, call) -> None:
+    counters, extractor = metered
     counters.fail = True
     _assert_error(_extract(call), 502, "extractor_failed")
     assert extractor.calls == 0
@@ -171,13 +172,22 @@ def test_502_when_cap_store_down_fails_closed(fakes, call) -> None:
 @pytest.mark.parametrize(
     "body",
     [
-        {"doc_type": "voter_id", "image_b64": "AAAA"},
+        {"doc_type": "voter_id", "ocr_lines": ["RAVI"]},
         {"doc_type": "aadhaar"},
-        {"doc_type": "aadhaar", "image_b64": "AAAA", "extra": 1},
+        {"doc_type": "aadhaar", "ocr_lines": []},
+        {"doc_type": "aadhaar", "ocr_lines": ["x"] * 41},
+        {"doc_type": "aadhaar", "ocr_lines": ["x" * 121]},
+        {"doc_type": "aadhaar", "ocr_lines": [7]},
+        {"doc_type": "aadhaar", "ocr_lines": ["RAVI"], "extra": 1},
+        {"doc_type": "aadhaar", "image_b64": "/9j/4AAQ"},  # images are no longer accepted
     ],
 )
 def test_400_invalid_request_extract(fakes, call, body) -> None:
     _assert_error(call("POST", "/v1/extract", body), 400, "invalid_request")
+
+
+def test_413_extract_too_large(fakes, call) -> None:
+    _assert_error(call("POST", "/v1/extract", raw_body=" " * 40_000), 413, "request_too_large")
 
 
 @pytest.mark.parametrize(
@@ -217,7 +227,7 @@ def test_404_unknown_route(fakes, call) -> None:
 
 
 def test_500_stats_unavailable(fakes, call) -> None:
-    fakes[0].fail = True
+    fakes.fail = True
     _assert_error(call("GET", "/v1/stats"), 500, "internal_error")
 
 
@@ -267,16 +277,15 @@ def _log_records(buf: io.StringIO) -> list[dict]:
 
 def test_logs_contain_no_field_values(fakes, call, logbuf, monkeypatch) -> None:
     """Fails if any log record contains a value from any test payload."""
-    _, extractor = fakes
-    extractor.lines = [*AADHAAR_LINES, OcrLine("Father: KRISHNAN", 0.9)]
-    call("POST", "/v1/extract", {"doc_type": "aadhaar", "image_b64": jpeg_b64()})
+    call("POST", "/v1/extract", {"doc_type": "aadhaar",
+                                 "ocr_lines": [*AADHAAR_LINES, "Father: KRISHNAN"]})
     call("POST", "/v1/compare", COMPARE_BODY)
     bad = json.loads(json.dumps(COMPARE_BODY))
     bad["documents"][0]["fields"]["dob"] = "RAVI KUMAR 2007-03-14"
     call("POST", "/v1/compare", bad)                                   # validation error
-    extractor.lines = [*AADHAAR_LINES, OcrLine("9999 9999 9999", 0.99)]
-    call("POST", "/v1/extract", {"doc_type": "aadhaar", "image_b64": jpeg_b64()})  # guard hit
-    call("POST", "/v1/extract", {"doc_type": "RAVI KUMAR", "image_b64": "x"})      # bad enum
+    call("POST", "/v1/extract",
+         {"doc_type": "aadhaar", "ocr_lines": [*AADHAAR_LINES, "9999 9999 9999"]})  # guard hit
+    call("POST", "/v1/extract", {"doc_type": "RAVI KUMAR", "ocr_lines": ["RAVI KUMAR"]})  # enum
 
     from backend import app as app_module
 

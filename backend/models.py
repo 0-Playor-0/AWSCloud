@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,6 +10,8 @@ DocType = Literal["aadhaar", "pan", "marksheet10", "passport", "passbook", "othe
 Purpose = Literal["general", "pan_aadhaar_link", "epf_claim"]
 
 MAX_NAME_CHARS = 100
+MAX_OCR_LINES = 40
+MAX_OCR_LINE_CHARS = 120
 
 
 class _Strict(BaseModel):
@@ -18,7 +20,9 @@ class _Strict(BaseModel):
 
 class ExtractRequest(_Strict):
     doc_type: DocType
-    image_b64: str = Field(min_length=4)  # size checked in the handler -> 413
+    ocr_lines: list[Annotated[str, Field(max_length=MAX_OCR_LINE_CHARS)]] = Field(
+        min_length=1, max_length=MAX_OCR_LINES
+    )
 
 
 class CompareFields(_Strict):

@@ -20,20 +20,6 @@ def invalid_request(message: str) -> ApiError:
     return ApiError(400, "invalid_request", message, "Check the request format and try again.")
 
 
-def invalid_image() -> ApiError:
-    return ApiError(
-        400, "invalid_image", "The image could not be read as a JPEG.",
-        "Crop the photo again in the app and resend it.",
-    )
-
-
-def image_too_large() -> ApiError:
-    return ApiError(
-        413, "image_too_large", "The image is too large.",
-        "Crop closer to the name and date of birth. The app resizes images to 1600 px.",
-    )
-
-
 def request_too_large() -> ApiError:
     return ApiError(413, "request_too_large", "The request is too large.",
                     "Send fewer or shorter fields.")
@@ -42,7 +28,7 @@ def request_too_large() -> ApiError:
 def id_number_detected() -> ApiError:
     return ApiError(
         422, "id_number_detected",
-        "The image seems to include an ID number. We discarded it without reading further.",
+        "The text seems to include an ID number. We discarded it without reading further.",
         "Crop again so only the name, date of birth and gender are visible. "
         "Leave out the Aadhaar number, photo and QR code.",
     )
@@ -50,7 +36,7 @@ def id_number_detected() -> ApiError:
 
 def unreadable() -> ApiError:
     return ApiError(
-        422, "unreadable", "We could not find a name, date of birth or gender in the image.",
+        422, "unreadable", "We could not find a name, date of birth or gender in the text.",
         "Retake the photo in good light, crop to the text, or type the fields instead.",
     )
 
@@ -68,7 +54,7 @@ def throttled() -> ApiError:
 
 
 def extractor_failed() -> ApiError:
-    return ApiError(502, "extractor_failed", "Reading the image failed.",
+    return ApiError(502, "extractor_failed", "Reading the document failed.",
                     "Try once more, or type the fields instead.")
 
 

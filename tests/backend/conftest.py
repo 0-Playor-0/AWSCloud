@@ -1,18 +1,16 @@
-"""Shared fixtures: realistic HTTP API v2 events, synthetic JPEGs, fake dependencies."""
+"""Shared fixtures: realistic HTTP API v2 events and fake dependencies."""
 
 from __future__ import annotations
 
-import base64
-import io
 import json
 from collections.abc import Callable
 from typing import Any
 
 import pytest
-from PIL import Image, ImageDraw
 
 from backend import app as app_module
 from backend.extractors import Extraction, ExtractorError, ExtractorThrottled
+from backend.extractors.client_ocr import ClientOcrExtractor
 from backend.parsers import OcrLine, parse
 
 
@@ -45,14 +43,6 @@ def make_event(method: str, path: str, body: Any = None, content_type: str = "ap
     }
 
 
-def jpeg_b64(width: int = 600, height: int = 200, text: str = "RAVI KUMAR") -> str:
-    img = Image.new("RGB", (width, height), "white")
-    ImageDraw.Draw(img).text((10, 10), text, fill="black")
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=70)
-    return base64.b64encode(buf.getvalue()).decode()
-
-
 class FakeCounters:
     def __init__(self, cap_left: int = 1000, fail: bool = False) -> None:
         self.cap_left = cap_left
@@ -80,30 +70,39 @@ class FakeCounters:
         return {"checks": len(self.checks), "checks_with_mismatch": sum(self.checks)}
 
 
-class FakeExtractor:
-    """Parses canned OCR lines with the real parsers; can simulate failures."""
+class FakeMeteredExtractor:
+    """Stands in for a paid extractor (future bedrock): the daily cap applies to it."""
 
-    name = "textract"
+    name = "fake_metered"
+    metered = True
 
     def __init__(self) -> None:
-        self.lines: list[OcrLine] = []
         self.error: type[Exception] | None = None
         self.calls = 0
 
-    def extract(self, doc_type: str, image: bytes) -> Extraction:
+    def extract(self, doc_type: str, lines: list[str]) -> Extraction:
         self.calls += 1
         if self.error:
             raise self.error("simulated")
-        return Extraction("\n".join(x.text for x in self.lines), parse(doc_type, self.lines))
+        return Extraction("\n".join(lines), parse(doc_type, [OcrLine(x, 0.95) for x in lines]))
 
 
 @pytest.fixture
-def fakes(monkeypatch: pytest.MonkeyPatch) -> tuple[FakeCounters, FakeExtractor]:
-    counters, extractor = FakeCounters(), FakeExtractor()
+def fakes(monkeypatch: pytest.MonkeyPatch) -> FakeCounters:
+    """Default deployment: client_ocr extractor (real), fake counters."""
+    counters = FakeCounters()
     monkeypatch.setattr(app_module, "deps", app_module.Deps())
     app_module.deps.counters = counters
+    app_module.deps.extractor = ClientOcrExtractor()
+    return counters
+
+
+@pytest.fixture
+def metered(fakes: FakeCounters) -> tuple[FakeCounters, FakeMeteredExtractor]:
+    extractor = FakeMeteredExtractor()
     app_module.deps.extractor = extractor
-    return counters, extractor
+    app_module.deps.settings.extractor = extractor.name
+    return fakes, extractor
 
 
 @pytest.fixture
@@ -115,4 +114,4 @@ def call() -> Callable[..., tuple[int, dict[str, Any]]]:
     return _call
 
 
-__all__ = ["ExtractorError", "ExtractorThrottled", "jpeg_b64", "make_event"]
+__all__ = ["ExtractorError", "ExtractorThrottled", "make_event"]

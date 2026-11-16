@@ -36,7 +36,7 @@ describe("classify", () => {
 
 describe("describeError", () => {
   const codes = [
-    "invalid_image", "image_too_large", "id_number_detected", "unreadable", "daily_cap_reached",
+    "id_number_detected", "unreadable", "daily_cap_reached",
     "throttled", "extractor_failed", "invalid_request", "request_too_large", "not_found",
     "internal_error", "network", "unexpected",
   ];
@@ -72,21 +72,27 @@ describe("requests", () => {
     return fn;
   };
 
+  it("sends only doc_type and ocr_lines to /v1/extract", async () => {
+    const fn = respond([200, { fields: {}, warnings: [] }]);
+    await extract("pan", ["RAVI KUMAR", "14/03/2007"]);
+    expect(JSON.parse(fn.mock.calls[0][1].body)).toEqual({ doc_type: "pan", ocr_lines: ["RAVI KUMAR", "14/03/2007"] });
+  });
+
   it("retries extract once on 502", async () => {
     const fn = respond([502, contract("extractor_failed")], [200, { fields: {}, warnings: [] }]);
-    expect((await extract("pan", "AAAA")).ok).toBe(true);
+    expect((await extract("pan", ["RAVI"])).ok).toBe(true);
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
   it("does not retry other errors", async () => {
     const fn = respond([422, contract("unreadable")]);
-    expect((await extract("pan", "AAAA")).ok).toBe(false);
+    expect((await extract("pan", ["RAVI"])).ok).toBe(false);
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it("maps a network failure to network", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    const r = await extract("pan", "AAAA");
+    const r = await extract("pan", ["RAVI"]);
     expect(r.ok === false && r.error.code).toBe("network");
   });
 

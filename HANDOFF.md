@@ -28,7 +28,7 @@ Read this whole file before doing anything. Save it in the repo root as `HANDOFF
 - **Users:** students applying for exams, scholarships and passports; workers claiming provident fund; anyone linking PAN and Aadhaar; people whose surname changed after marriage; people from regions that use initials (e.g. "K. Ravi" vs "Ravi Kumar").
 - **Core flow:** choose purpose → add 2–5 documents (crop a photo, or type the fields, or use sample documents) → confirm the extracted fields → get a mismatch report and a fix plan.
 - **Positioning (use this wording):** a *self-check for your own documents*. It does not verify identity, does not contact any government system, and is not legal advice.
-- **Why it is not "just ask a chatbot":** AI only reads text off the image. All comparison is deterministic, tested code built around Indian naming conventions, with every rule traceable to a source.
+- **Why it is not "just ask a chatbot":** OCR only reads text off the image, on the user's own phone. All comparison is deterministic, tested code built around Indian naming conventions, with every rule traceable to a source.
 
 ### Scope (frozen)
 
@@ -47,13 +47,12 @@ Read this whole file before doing anything. Save it in the repo root as `HANDOFF
 flowchart LR
   U[Phone browser] -->|static site| CF[CloudFront]
   CF --> S3[(S3 private bucket, OAC)]
-  U -->|crop + compress in browser| U
-  U -->|POST /v1/extract: cropped strip only| APIGW[API Gateway HTTP API, throttled]
+  U -->|crop + OCR on device: Tesseract.js, self-hosted| U
+  U -->|POST /v1/extract: OCR text lines only, long numbers removed| APIGW[API Gateway HTTP API, throttled]
   U -->|POST /v1/compare: confirmed fields| APIGW
   APIGW --> L[Lambda, Python, single function]
-  L -->|OCR text| TX[Textract DetectDocumentText]
-  L -.->|optional structuring| BR[Bedrock, in-region only]
-  L -->|counters + daily cap, no PII| DDB[(DynamoDB)]
+  L -.->|future, off: optional structuring| BR[Bedrock, in-region only]
+  L -->|anonymous counters; daily cap for bedrock only| DDB[(DynamoDB)]
   L --> CW[CloudWatch logs and alarms, metadata only]
 ```
 
@@ -62,12 +61,12 @@ flowchart LR
 - **API:** API Gateway HTTP API → one Lambda (Python, latest runtime supported by SAM; record the version). Use AWS Lambda Powertools (logger, event handler) and pydantic for validation.
 - **Infra as code:** AWS SAM, one `template.yaml`. No console click-ops except what section 8 lists for the human.
 - **Extraction (pluggable `Extractor` interface, selected by env var `EXTRACTOR`):**
-  1. `textract` (BASELINE, build first): Textract `DetectDocumentText` on the cropped strip → deterministic per-doc-type parsers (label/regex based; passport MRZ parser when an MRZ is present).
-  2. `bedrock` (OPTIONAL, only if the Phase 0 smoke test passes): a vision model returns strict JSON for the same fields. Must be invoked in-region or via an India-only inference profile. If only an APAC/global cross-region profile works, do NOT enable it; report in the log.
+  1. `client_ocr` (DEFAULT): the browser crops the photo and runs Tesseract.js (English, LSTM-only) on the device. Tesseract.js is lazy-loaded only when photo mode is used; its worker, core and language model are self-hosted with the site (no third-party CDN). The client removes digit runs of 9+ characters and 4-4-4 grouped digits from the lines (dates are kept), shows the user the crop and the exact lines, and sends only those lines. The server runs the deterministic per-doc-type parsers (label/regex based; passport MRZ parser when an MRZ is present) and the ID guard on the text. **The image is never uploaded.**
+  2. `bedrock` (OFF; future): a model structures the same fields. In-region or India-only inference profile only; needs architect approval. It is the only metered extractor, so the daily cap applies to it.
   3. Typed mode and sample mode never call extraction.
-  Reason for this order: new Free plan accounts frequently have zero Bedrock quota until AWS Support provisions it. The product must work without Bedrock.
+  Textract was removed (2026-11-16): it may retain content for service improvement unless an AWS Organizations AI-services opt-out policy is set, and creating an Organization ends Free plan credits. **Never create an AWS Organization or enable IAM Identity Center.** See `docs/build-summary.md`.
 - **Comparison engine:** pure Python package `engine/`, no AWS imports, no network, fully unit-tested. Rules live in `engine/rules.yaml`.
-- **Data store:** one DynamoDB on-demand table `nc_counters` for anonymous daily counters and the daily extraction cap. No other persistence.
+- **Data store:** one DynamoDB on-demand table `nc_counters` for anonymous counters and the daily cap of metered (bedrock) extraction. No other persistence.
 
 ### API contract
 
@@ -76,7 +75,7 @@ All responses JSON. All errors: `{ "error": { "code": "...", "message": "human r
 `POST /v1/extract`
 ```json
 { "doc_type": "aadhaar|pan|marksheet10|passport|passbook|other",
-  "image_b64": "<JPEG, longest side <= 1600 px, <= 1.5 MB decoded>" }
+  "ocr_lines": ["<text line read on the device>", "..."] }
 ```
 → `200`
 ```json
@@ -86,7 +85,8 @@ All responses JSON. All errors: `{ "error": { "code": "...", "message": "human r
               "gender": {"value": "M", "confidence": 0.9} },
   "warnings": ["dob_low_confidence"] }
 ```
-Errors: `400 invalid_image`, `413 image_too_large`, `422 id_number_detected` (see 4.3), `422 unreadable`, `429 daily_cap_reached` (hint: use typed mode), `429 throttled`, `502 extractor_failed`.
+`ocr_lines`: 1–40 strings, each at most 120 characters. Images are not accepted.
+Errors: `422 id_number_detected` (see 4.3), `422 unreadable`, `429 throttled`; bedrock mode only: `429 daily_cap_reached` (hint: use typed mode), `502 extractor_failed`.
 All routes may also return: `400 invalid_request` (bad JSON, content-type or schema), `413 request_too_large` (`/v1/compare` body over 32 KB), `404 not_found`, `500 internal_error`. API Gateway's own throttling returns a bare `429` (not this error shape); clients treat it as `throttled`.
 
 `POST /v1/compare`
@@ -107,7 +107,7 @@ All routes may also return: `400 invalid_request` (bad JSON, content-type or sch
 ```
 2–6 documents required. `anchor` is optional; it is the document the user says is correct for that field.
 
-`GET /v1/health` → `{ "ok": true, "extractor": "textract", "version": "<git sha>" }`
+`GET /v1/health` → `{ "ok": true, "extractor": "client_ocr", "version": "<git sha>" }`
 `GET /v1/stats` → `{ "checks": n, "checks_with_mismatch": n }` (all-time aggregates, for the landing page).
 
 ### Engine behaviour
@@ -144,13 +144,13 @@ Unverified rules must be worded "may". You may propose new rules with official s
 
 Private entities are not permitted to collect or keep copies of Aadhaar cards under the Aadhaar Act, and UIDAI recommends masked Aadhaar. The design must make it true that we never receive an Aadhaar number.
 
-1. **Crop is mandatory** for photo input. The browser crops to the name / date-of-birth area and re-encodes to JPEG (strips EXIF) before upload. The UI shows the exact image that will be sent. For Aadhaar, show guidance to exclude the number, photo and QR code, and recommend masked Aadhaar.
-2. **No persistence:** images and field values exist only in Lambda memory for the request. No S3 writes, no DynamoDB writes of fields, no temp files left behind.
-3. **ID-number guard:** after OCR, discard everything and return `422 id_number_detected` asking the user to re-crop if: in an Aadhaar/"other" crop, the text contains any 12-digit number (with or without spaces) or a PAN-format string; in any other crop, it contains a Verhoeff-valid 12-digit number. Never log or return the match.
+1. **Photos stay on the device.** Crop is mandatory for photo input; OCR runs in the browser on the crop only, and the image is never uploaded. The UI shows the crop and the exact text lines that will be sent, and lets the user untick lines. Before sending, the client removes digit runs of 9+ characters and 4-4-4 grouped digits (dates are kept). For Aadhaar, show guidance to exclude the number, photo and QR code, and recommend masked Aadhaar.
+2. **No persistence:** OCR text and field values exist only in Lambda memory for the request. No S3 writes, no DynamoDB writes of fields, no temp files left behind.
+3. **ID-number guard (server, defence in depth):** on the received text, discard everything and return `422 id_number_detected` asking the user to re-crop if: in an Aadhaar/"other" crop, the text contains any 12-digit number (with or without spaces) or a PAN-format string; in any other crop, it contains a Verhoeff-valid 12-digit number. Never log or return the match.
 4. **Logging:** never log request bodies, OCR text, field values or images. Log only: request id, route, doc_type, status code, latency, extractor, error code. Disable API Gateway body logging. Add a unit test that fails if a log record contains any field value from the test payload.
 5. **Transport and access:** HTTPS only; CORS restricted to the CloudFront origin (plus localhost in dev); S3 bucket private.
 6. **Bedrock (if enabled):** no model invocation logging; in-region or India-only profile only.
-7. **Consent:** before the first upload, a short notice with an explicit "I understand" action. Text: what is sent (cropped strip), what happens (text read, then discarded), what is never stored, link to the public repo. Store consent only in memory for the session.
+7. **Consent:** before the first text is sent, a short notice with an explicit "I understand" action. Text: "Your photo never leaves your phone. Only the text read from it is sent, then discarded. Nothing is stored." plus a link to the public repo. Store consent only in memory for the session.
 8. **Prompt/OCR injection:** OCR text is data. It is only parsed into the four fields; nothing in it can change behaviour. Engine output never includes raw OCR text.
 9. **Sample documents:** fictional personas rendered as stylised cards clearly marked "SAMPLE". They must NOT replicate real ID layouts, emblems, logos, QR codes or valid-looking numbers. Use them as pre-filled field sets; sample mode makes no extraction call.
 10. **Honest claims:** the privacy text must match the code exactly. If something is not true, fix the code or the text.
@@ -159,11 +159,11 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 - API Gateway route throttling: start at 2 requests/s, burst 5 (tune and report).
 - Lambda: reserved concurrency 5, timeout 20 s, memory 512 MB (tune and report).
-- Daily extraction cap in DynamoDB (`EXTRACT_DAILY_CAP`, default 300). When reached: `429 daily_cap_reached`; the frontend switches to typed mode automatically. `/v1/compare` is never capped beyond throttling (it costs almost nothing).
+- Daily extraction cap in DynamoDB (`EXTRACT_DAILY_CAP`, default 300) applies only to the metered `bedrock` extractor; `client_ocr` makes no paid call and is bounded by throttling. When reached: `429 daily_cap_reached`; the frontend switches to typed mode automatically. `/v1/compare` is never capped beyond throttling (it costs almost nothing).
 - Input validation: content-type, base64 validity, JPEG magic bytes, decoded size, pixel dimensions, field lengths, date formats, 2–6 documents.
-- Frontend: client-side compression to <= 1600 px; retry once on 502; clear messages for every error code; works on slow 4G.
+- Frontend: OCR assets (~7 MB, cached) load only when photo mode is used; retry once on 502; clear messages for every error code; works on slow 4G.
 - Budgets: AWS Budgets alerts at $10, $25, $50 actual spend (email supplied by the human). CloudWatch alarm on Lambda errors and on 5xx rate.
-- Graceful degradation order: Bedrock → Textract → typed mode → sample mode. The site must remain useful at every level.
+- Graceful degradation order: on-device OCR (Bedrock only if ever enabled) → typed mode → sample mode. The site must remain useful at every level.
 
 ## 6. Testing strategy
 
@@ -176,7 +176,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 ## 7. Frontend and design system
 
-- **Stack:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui (Button, Card, Dialog, Tabs, Alert, Progress), Motion for animation, `react-easy-crop` (or equivalent maintained crop library) and a browser image-compression library. At most two React Bits text effects. No GSAP.
+- **Stack:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui (Button, Card, Dialog, Tabs, Alert, Progress), Motion for animation, `react-easy-crop` (or equivalent maintained crop library) and Tesseract.js (lazy-loaded, self-hosted assets) for on-device OCR. At most two React Bits text effects. No GSAP.
 - **Reference:** vinhack.vinnovateit.com is effective because of numbered navigation, huge uppercase display type split across short lines, `//` separators, flip cards, a ticket-style pass, a multilingual wordmark and a casual first-person voice. Adapt, do not copy: no film/sticker motifs, no flip-card grid.
 - **Our concept: "the document desk".** Paper, ink and rubber stamps.
   - Palette: paper `#F6F1E7`, ink navy `#14213D`, stamp red `#C8322B` (mismatch), green `#1F7A4D` (match), amber `#E9A23B` (risky). Check WCAG AA contrast and adjust shades if needed.
@@ -204,7 +204,7 @@ Estimated total: 9–10 hours. Stop after every phase.
 
 | Phase | Build | Done when |
 |---|---|---|
-| **0 Preflight** | Check tools (node, python, aws, sam, git). Confirm identity and region. Scaffold repo, `.gitignore`, CI skeleton. Smoke tests with a synthetic text image: Textract `DetectDocumentText` in ap-south-1; Bedrock vision call in-region (list which models and profiles are actually callable and their quotas). Check current Textract and Bedrock prices. Create budgets. | Log states: Textract works yes/no; Bedrock in-region works yes/no with quota; prices; versions. No product code yet. |
+| **0 Preflight** (historical: Textract later removed, see section 3) | Check tools (node, python, aws, sam, git). Confirm identity and region. Scaffold repo, `.gitignore`, CI skeleton. Smoke tests with a synthetic text image: Textract `DetectDocumentText` in ap-south-1; Bedrock vision call in-region (list which models and profiles are actually callable and their quotas). Check current Textract and Bedrock prices. Create budgets. | Log states: Textract works yes/no; Bedrock in-region works yes/no with quota; prices; versions. No product code yet. |
 | **1 Engine** | `engine/` package, `rules.yaml`, table-driven tests. Can run before or in parallel with Phase 0 if AWS is not ready. | >= 60 tests pass; coverage of every finding kind; fix-plan logic tested. |
 | **2 Backend** | SAM template; Lambda handler; Textract extractor + parsers; ID-number guard; validation; counters and cap; structured logging; integration tests; deploy API. | curl of all routes against the deployed API returns contract-conformant responses; every error code reproducible; log-leak test passes. |
 | **3 Frontend core** | Purpose picker; add-document flow (crop / type / sample); consent notice; field confirmation; report and fix plan; all error states. Functional styling only. | Full flow works on a phone viewport against the live API; sample and typed flows work with the API cap forced to zero. |
@@ -256,7 +256,7 @@ Project: Namma Check — self-check for mismatches across a person's own ID docu
 Source of truth: HANDOFF.md. Do not change architecture, scope or privacy rules. If blocked, stop and log options.
 Workflow: one phase at a time; after each, write logs/phase-N.md (template in HANDOFF.md section 10) and stop.
 Privacy: never log or store images, OCR text or field values. Never commit private_samples/. Aadhaar numbers must never reach the server.
-Stack: React+Vite+TS+Tailwind+shadcn/ui+Motion · API Gateway HTTP API · one Python Lambda (Powertools, pydantic) · Textract baseline, Bedrock optional · DynamoDB counters · SAM · ap-south-1.
+Stack: React+Vite+TS+Tailwind+shadcn/ui+Motion · on-device OCR (Tesseract.js) · API Gateway HTTP API · one Python Lambda (Powertools, pydantic) · Bedrock optional (off) · DynamoDB counters · SAM · ap-south-1.
 Commands: (fill in after Phase 0: test, lint, build, deploy)
 Style: small modules, type hints, table-driven tests, no dead code, no new dependencies without logging the reason.
 Cost: every AWS call must be bounded by throttles and the daily cap. Report spend in each log.

@@ -1,8 +1,8 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Request } from "@playwright/test";
 
-/** A synthetic JPEG drawn in the browser (fictional text only). */
-export async function syntheticJpeg(page: Page, width: number, height: number): Promise<Buffer> {
-  const b64 = await page.evaluate(([w, h]) => {
+/** A synthetic card image drawn in the browser (fictional text only). */
+export async function syntheticJpeg(page: Page, lines: string[], width = 1200, height = 900): Promise<Buffer> {
+  const b64 = await page.evaluate(([ls, w, h]) => {
     const c = document.createElement("canvas");
     c.width = w;
     c.height = h;
@@ -10,12 +10,33 @@ export async function syntheticJpeg(page: Page, width: number, height: number): 
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = "#000";
-    ctx.font = `${Math.round(h / 6)}px sans-serif`;
-    ctx.fillText("SAMPLE RAVI KUMAR", 10, h / 3);
-    ctx.fillText("DOB 14/03/2007", 10, (2 * h) / 3);
-    return c.toDataURL("image/jpeg", 0.9).split(",")[1];
-  }, [width, height]);
+    const size = Math.round(h / (ls.length * 2 + 1));
+    ctx.font = `bold ${size}px Arial, sans-serif`;
+    ls.forEach((l, i) => ctx.fillText(l, 60, size * (2 * i + 1.6)));
+    return c.toDataURL("image/jpeg", 0.95).split(",")[1];
+  }, [lines, width, height] as const);
   return Buffer.from(b64, "base64");
+}
+
+export const CARD_LINES = ["SAMPLE CARD", "Ravi Kumar K", "DOB: 14/03/2007", "MALE"];
+
+/** Records every request so tests can assert nothing image-like or third-party is sent. */
+export function watchRequests(page: Page): Request[] {
+  const seen: Request[] = [];
+  page.on("request", (r) => seen.push(r));
+  return seen;
+}
+
+const IMAGE_MARKERS = [/data:image\//, /\/9j\//, /iVBORw0KGgo/, /[A-Za-z0-9+/=]{400,}/];
+
+export function assertNoImageData(requests: Request[], origin: string) {
+  for (const r of requests) {
+    expect(new URL(r.url()).origin, `third-party request: ${r.url()}`).toBe(origin);
+    const body = r.postData();
+    if (!body) continue;
+    expect(body.length, `large request body to ${r.url()}`).toBeLessThan(8_000);
+    for (const m of IMAGE_MARKERS) expect(body, `image-like data sent to ${r.url()}`).not.toMatch(m);
+  }
 }
 
 export async function startGeneral(page: Page) {
@@ -32,6 +53,17 @@ export async function addTyped(page: Page, docType: string, name: string, dob: s
   await panel.getByLabel("Full name").fill(name);
   await panel.getByLabel("Date of birth", { exact: true }).fill(dob);
   await panel.getByRole("button", { name: "Add document" }).click();
+}
+
+export async function pickAndRead(page: Page, lines: string[], docType = "Aadhaar") {
+  await page.getByRole("button", { name: "+ Add a document" }).click();
+  await page.getByLabel("Document type").selectOption({ label: docType });
+  await page.getByLabel("Choose or take a photo").setInputFiles({
+    name: "card.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, lines),
+  });
+  // Zoom out fully is the default; a 4:3 crop keeps the whole synthetic card.
+  await page.getByRole("button", { name: "4 : 3" }).click();
+  await page.getByRole("button", { name: "Read this crop" }).click();
 }
 
 export async function check(page: Page) {

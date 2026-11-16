@@ -1,14 +1,9 @@
 """Local API for frontend development: the real Lambda handler behind a stdlib HTTP server.
 
-AWS is replaced by fakes: an in-memory counter store and an extractor that returns fixed,
-fictional OCR lines per doc type (the image is ignored). Nothing is logged except the
-handler's own metadata-only line.
+Extraction is the real client_ocr path (it needs no AWS). Only the DynamoDB counter store is
+replaced, by an in-memory one. Nothing is logged except the handler's own metadata-only line.
 
-    .venv/bin/python scripts/local_api.py [--port 8787] [--cap 300]
-
-Test hooks (synthetic, dev only): a crop narrower than 300 px reads as containing a fake
-12-digit ID number (-> 422 id_number_detected); narrower than 200 px reads as blank
-(-> 422 unreadable).
+    .venv/bin/python scripts/local_api.py [--port 8787]
 """
 
 from __future__ import annotations
@@ -22,35 +17,15 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend import app as app_module  # noqa: E402
-from backend import imaging  # noqa: E402
-from backend.extractors import Extraction  # noqa: E402
-from backend.parsers import OcrLine, parse  # noqa: E402
-
-FAKE_LINES: dict[str, list[str]] = {
-    "aadhaar": ["SAMPLE", "Ravi Kumar K", "DOB: 14/03/2007", "MALE"],
-    "pan": ["SAMPLE", "Name", "RAVI KUMAR", "Father's Name", "KRISHNAN K",
-            "Date of Birth", "14/03/2007"],
-    "marksheet10": ["SAMPLE", "Name of Candidate: K RAVI KUMAR",
-                    "Father's Name: KRISHNAN", "Date of Birth: 14-03-2007"],
-    "passport": ["SAMPLE", "Surname", "KUMAR", "Given Name(s)", "RAVI",
-                 "Date of Birth", "14/03/2007", "Sex", "M"],
-    "passbook": ["SAMPLE", "Customer Name: RAVI KUMAR", "DOB: 14-Mar-2007"],
-    "other": ["SAMPLE", "Member Name: RAVI KUMAR K", "Date of Birth: 14/03/2007", "Gender: Male"],
-}
-FAKE_ID_LINE = "9999 9999 9999"  # synthetic
 
 
 class MemoryCounters:
     def __init__(self) -> None:
-        self.extractions = 0
         self.checks = 0
         self.mismatches = 0
 
-    def consume_extraction(self, cap: int) -> bool:
-        if self.extractions >= cap:
-            return False
-        self.extractions += 1
-        return True
+    def consume_extraction(self, cap: int) -> bool:  # metered extractors only; none locally
+        return cap > 0
 
     def record_check(self, mismatch: bool) -> None:
         self.checks += 1
@@ -58,18 +33,6 @@ class MemoryCounters:
 
     def stats(self) -> dict[str, int]:
         return {"checks": self.checks, "checks_with_mismatch": self.mismatches}
-
-
-class FakeExtractor:
-    name = "local-fake"
-
-    def extract(self, doc_type: str, image: bytes) -> Extraction:
-        width = (imaging.jpeg_size(image) or (0, 0))[0]
-        texts = [] if width < 200 else list(FAKE_LINES[doc_type])
-        if 200 <= width < 300:
-            texts.append(FAKE_ID_LINE)
-        lines = [OcrLine(t, 0.95) for t in texts]
-        return Extraction("\n".join(texts), parse(doc_type, lines))
 
 
 def _event(method: str, path: str, headers: dict[str, str], body: str | None) -> dict[str, Any]:
@@ -113,15 +76,11 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8787)
-    ap.add_argument("--cap", type=int, default=300, help="daily extraction cap (0 = forced off)")
     args = ap.parse_args()
-    app_module.deps.settings.daily_cap = args.cap
     app_module.deps.settings.version = "local"
-    app_module.deps.settings.extractor = FakeExtractor.name
-    app_module.deps.extractor = FakeExtractor()
     app_module.deps.counters = MemoryCounters()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"local API on http://127.0.0.1:{args.port} (cap {args.cap})", flush=True)
+    print(f"local API on http://127.0.0.1:{args.port}", flush=True)
     server.serve_forever()
 
 

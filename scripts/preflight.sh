@@ -2,14 +2,14 @@
 # Phase 0 AWS checks. Run on your machine from the repo root:
 #   scripts/preflight.sh you@example.com            # checks + creates the budget
 #   scripts/preflight.sh                            # checks only
-#   BEDROCK_MODEL_ID=<id> scripts/preflight.sh ...  # also try one in-region vision call
 # Output is safe to paste back: the account ID is masked, nothing secret is printed.
 set -uo pipefail
 export AWS_REGION=ap-south-1 AWS_DEFAULT_REGION=ap-south-1 AWS_PAGER=""
 EMAIL="${1:-}"
 mask() { sed -E 's/[0-9]{12}/<account>/g'; }
+exec > >(mask) 2>&1  # mask the account ID in errors too
 section() { printf '\n=== %s ===\n' "$1"; }
-WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT  # budget JSON only
 
 section "Tool versions"
 for t in aws sam python3 node git make; do printf '%s: ' "$t"; ($t --version 2>&1 || echo missing) | head -1; done
@@ -23,12 +23,6 @@ fi
 
 section "Lambda concurrency (reserved concurrency needs headroom)"
 aws lambda get-account-settings --query 'AccountLimit.{ConcurrentExecutions:ConcurrentExecutions,Unreserved:UnreservedConcurrentExecutions}' --output json
-
-section "Textract DetectDocumentText smoke test (synthetic image)"
-python3 scripts/make_images.py "$WORK" >/dev/null
-aws textract detect-document-text --document "Bytes=fileb://$WORK/text.jpg" \
-  --query 'Blocks[?BlockType==`LINE`].[Text,Confidence]' --output text \
-  && echo "TEXTRACT: OK" || echo "TEXTRACT: FAILED"
 
 section "Bedrock: models with image input callable on demand in ap-south-1"
 aws bedrock list-foundation-models --by-inference-type ON_DEMAND \
@@ -46,17 +40,6 @@ section "Bedrock: on-demand quotas (requests/tokens per minute)"
 aws service-quotas list-service-quotas --service-code bedrock \
   --query 'Quotas[?contains(QuotaName, `On-demand`) && (contains(QuotaName, `requests per minute`) || contains(QuotaName, `tokens per minute`))].[QuotaName,Value]' \
   --output text | sort | head -60 || echo "QUOTAS: FAILED"
-
-if [[ -n "${BEDROCK_MODEL_ID:-}" ]]; then
-  section "Bedrock vision smoke: $BEDROCK_MODEL_ID (in-region)"
-  B64=$(base64 < "$WORK/text.jpg" | tr -d '\n')
-  cat > "$WORK/msg.json" <<EOF
-[{"role":"user","content":[{"image":{"format":"jpeg","source":{"bytes":"$B64"}}},{"text":"Return only the text you can read."}]}]
-EOF
-  aws bedrock-runtime converse --model-id "$BEDROCK_MODEL_ID" --messages "file://$WORK/msg.json" \
-    --inference-config maxTokens=100 --query 'output.message.content[0].text' --output text \
-    && echo "BEDROCK INVOKE: OK" || echo "BEDROCK INVOKE: FAILED"
-fi
 
 section "Budget (alerts at \$10, \$25, \$50 actual)"
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)

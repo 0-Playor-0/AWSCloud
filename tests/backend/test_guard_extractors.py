@@ -1,13 +1,7 @@
-"""ID-number guard and JPEG validation."""
-
-import base64
-import io
+"""ID-number guard and extractor selection."""
 
 import pytest
-from PIL import Image
 
-from backend import imaging
-from backend.errors import ApiError
 from backend.guard import contains_id_number, verhoeff_valid
 
 
@@ -54,44 +48,10 @@ def test_verhoeff(digits: str, valid: bool) -> None:
     assert verhoeff_valid(digits) is valid
 
 
-def _jpeg(width: int, height: int, progressive: bool = False) -> bytes:
-    buf = io.BytesIO()
-    Image.new("RGB", (width, height), "white").save(buf, "JPEG", progressive=progressive)
-    return buf.getvalue()
+@pytest.mark.parametrize("name", ["textract", "bedrock", ""])
+def test_only_client_ocr_is_built(name: str) -> None:
+    from backend.extractors import get_extractor
 
-
-@pytest.mark.parametrize("w,h,prog", [(600, 200, False), (1600, 900, False), (300, 1200, True)])
-def test_jpeg_size(w: int, h: int, prog: bool) -> None:
-    assert imaging.jpeg_size(_jpeg(w, h, prog)) == (w, h)
-
-
-def _png() -> bytes:
-    buf = io.BytesIO()
-    Image.new("RGB", (10, 10)).save(buf, "PNG")
-    return buf.getvalue()
-
-
-@pytest.mark.parametrize("data", [b"", b"\xff\xd8\xff", b"\xff\xd8\xff\xe0\x00", _png(),
-                                  b"\xff\xd8\xff\xe0\x00\x01xx"])
-def test_jpeg_size_rejects_garbage(data: bytes) -> None:
-    assert imaging.jpeg_size(data) is None
-
-
-@pytest.mark.parametrize(
-    "payload,code",
-    [
-        ("not base64!!", "invalid_image"),
-        (base64.b64encode(_png()).decode(), "invalid_image"),
-        (base64.b64encode(_jpeg(1601, 100)).decode(), "image_too_large"),
-        (base64.b64encode(b"\xff\xd8\xff" + b"\x00" * 1_500_001).decode(), "image_too_large"),
-    ],
-)
-def test_decode_image_errors(payload: str, code: str) -> None:
-    with pytest.raises(ApiError) as exc:
-        imaging.decode_image(payload)
-    assert exc.value.code == code
-
-
-def test_decode_image_ok() -> None:
-    data = _jpeg(800, 300)
-    assert imaging.decode_image(base64.b64encode(data).decode()) == data
+    assert get_extractor("client_ocr").name == "client_ocr"
+    with pytest.raises(ValueError):
+        get_extractor(name)

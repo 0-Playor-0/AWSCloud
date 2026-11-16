@@ -60,9 +60,9 @@ const validExtract = (b: unknown) => isObj(b) && isObj(b.fields) && Array.isArra
 const validCompare = (b: unknown) =>
   isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan);
 
-/** POST /v1/extract; retries once on 502 (HANDOFF.md section 5). */
-export async function extract(docType: DocType, imageB64: string): Promise<ApiResult<ExtractResponse>> {
-  const init = postJson({ doc_type: docType, image_b64: imageB64 });
+/** POST /v1/extract with on-device OCR text only; retries once on 502 (HANDOFF.md section 5). */
+export async function extract(docType: DocType, ocrLines: string[]): Promise<ApiResult<ExtractResponse>> {
+  const init = postJson({ doc_type: docType, ocr_lines: ocrLines });
   const first = await request<ExtractResponse>("/v1/extract", init, validExtract);
   if (first.ok || first.status !== 502) return first;
   return request<ExtractResponse>("/v1/extract", init, validExtract);

@@ -1,4 +1,10 @@
-"""Pluggable extractors, chosen by the EXTRACTOR env var (HANDOFF.md section 3)."""
+"""Pluggable extractors, chosen by the EXTRACTOR env var (HANDOFF.md section 3).
+
+- client_ocr (default): the browser runs OCR on the cropped photo and sends only text lines;
+  the server parses them. No AWS call, so no daily cap.
+- bedrock (off; future, in-region only): not built. It would be `metered`, so the daily cap
+  applies to it.
+"""
 
 from __future__ import annotations
 
@@ -24,14 +30,14 @@ class ExtractorThrottled(Exception):
 
 class Extractor(Protocol):
     name: str
+    metered: bool  # True when each call costs money: the daily cap applies
 
-    def extract(self, doc_type: str, image: bytes) -> Extraction: ...
+    def extract(self, doc_type: str, lines: list[str]) -> Extraction: ...
 
 
 def get_extractor(name: str) -> Extractor:
-    if name == "textract":
-        from .textract import TextractExtractor
+    if name == "client_ocr":
+        from .client_ocr import ClientOcrExtractor
 
-        return TextractExtractor()
-    # "bedrock" is optional and not built until the Phase 0 smoke test passes and is approved.
+        return ClientOcrExtractor()
     raise ValueError(f"unsupported EXTRACTOR: {name}")

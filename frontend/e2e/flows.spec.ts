@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { addTyped, check, startGeneral, syntheticJpeg } from "./helpers";
+import { addTyped, assertNoImageData, CARD_LINES, check, pickAndRead, startGeneral, watchRequests } from "./helpers";
 
 test("sample flow: load a sample set and get a report", async ({ page }) => {
   await page.goto("/");
@@ -33,86 +33,107 @@ test("all match", async ({ page }) => {
   await expect(page.getByTestId("report-status")).toHaveText("Everything matches");
 });
 
-test("photo flow: consent, exact preview, extract, confirm", async ({ page }) => {
+test("photo flow: on-device OCR, numbers stripped, consent, text only sent", async ({ page, baseURL }) => {
+  const requests = watchRequests(page);
   await startGeneral(page);
-  await page.getByRole("button", { name: "+ Add a document" }).click();
-  await expect(page.getByText(/leave out the Aadhaar number, your photo and the QR code/)).toBeVisible();
-  await page.getByLabel("Choose or take a photo").setInputFiles({
-    name: "card.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, 1800, 1200),
-  });
-  await page.getByRole("button", { name: "Use this crop" }).click();
-  const preview = page.getByTestId("upload-preview");
-  await expect(preview).toBeVisible();
-  const size = await preview.evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]);
-  expect(Math.max(...size)).toBeLessThanOrEqual(1600);
+  await pickAndRead(page, [...CARD_LINES, "9999 9999 9999"]);
+  await expect(page.getByTestId("crop-preview")).toBeVisible();
+  const lines = page.getByTestId("ocr-lines");
+  await expect(lines).toContainText("Ravi Kumar", { timeout: 45_000 });
+  await expect(lines).not.toContainText("9999");
+  await expect(page.getByText(/We removed 1 long number/)).toBeVisible();
+  expect(requests.filter((r) => r.url().includes("/v1/"))).toHaveLength(0); // nothing sent yet
 
-  let extractCalls = 0;
-  page.on("request", (r) => { if (r.url().includes("/v1/extract")) extractCalls += 1; });
-  await page.getByRole("button", { name: "Read the text" }).click();
-  const dialog = page.getByRole("dialog", { name: "Before you upload" });
-  await expect(dialog).toBeVisible();
-  expect(extractCalls).toBe(0); // nothing sent before consent
+  await page.getByRole("button", { name: "Send this text" }).click();
+  const dialog = page.getByRole("dialog", { name: "Before you send" });
+  await expect(dialog).toContainText("Your photo never leaves your phone. Only the text read from it is sent, then discarded. Nothing is stored.");
+  expect(requests.filter((r) => r.url().includes("/v1/extract"))).toHaveLength(0);
+  const extractReq = page.waitForRequest("**/v1/extract");
   await dialog.getByRole("button", { name: "I understand" }).click();
+  const body = JSON.parse((await extractReq).postData()!);
+  expect(Object.keys(body).sort()).toEqual(["doc_type", "ocr_lines"]);
+  expect(body.ocr_lines.join(" ")).not.toMatch(/\d{9,}|\d{4}\s\d{4}\s\d{4}/);
 
   await expect(page.getByText("Check what we read.")).toBeVisible();
-  await expect(page.getByLabel("Full name")).toHaveValue("RAVI KUMAR K");
+  await expect(page.getByLabel("Full name")).toHaveValue(/RAVI KUMAR/);
   await page.getByRole("button", { name: "Add document" }).click();
   await expect(page.getByText("from photo")).toBeVisible();
 
-  // Consent is remembered for the session: the second upload goes straight through.
-  await page.getByRole("button", { name: "+ Add a document" }).click();
-  await page.getByLabel("Document type").selectOption({ label: "PAN card" });
-  await page.getByLabel("Choose or take a photo").setInputFiles({
-    name: "pan.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, 900, 600),
-  });
-  await page.getByRole("button", { name: "Use this crop" }).click();
-  await page.getByRole("button", { name: "Read the text" }).click();
-  await expect(page.getByLabel("Full name")).toHaveValue("RAVI KUMAR");
+  // Consent is remembered for the session: the second send goes straight through.
+  await pickAndRead(page, ["SAMPLE CARD", "Name: RAVI KUMAR", "DOB: 14/03/2007"], "Bank passbook");
+  await expect(page.getByTestId("ocr-lines")).toContainText("RAVI", { timeout: 45_000 });
+  await page.getByRole("button", { name: "Send this text" }).click();
+  await expect(page.getByText("Check what we read.")).toBeVisible();
   await page.getByRole("button", { name: "Add document" }).click();
   await check(page);
   await expect(page.getByTestId("report-status")).not.toBeEmpty();
+
+  assertNoImageData(requests, new URL(baseURL!).origin);
 });
 
-test("id_number_detected asks for a new crop", async ({ page }) => {
+test("unticked lines are not sent", async ({ page }) => {
   await startGeneral(page);
-  await page.getByRole("button", { name: "+ Add a document" }).click();
-  // The local API reads crops 200–299 px wide as containing a synthetic 12-digit number.
-  await page.getByLabel("Choose or take a photo").setInputFiles({
-    name: "narrow.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, 250, 400),
-  });
-  await page.getByRole("button", { name: "Use this crop" }).click();
-  await page.getByRole("button", { name: "Read the text" }).click();
+  await pickAndRead(page, CARD_LINES);
+  const lines = page.getByTestId("ocr-lines");
+  await expect(lines).toContainText("SAMPLE", { timeout: 45_000 });
+  await lines.getByRole("listitem").filter({ hasText: "SAMPLE" }).getByRole("checkbox").uncheck();
+  const req = page.waitForRequest("**/v1/extract");
+  await page.getByRole("button", { name: "Send this text" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "I understand" }).click();
-  const alert = page.locator("[data-error-code=id_number_detected]");
-  await expect(alert).toContainText("seems to include an ID number");
-  await expect(page.getByTestId("upload-preview")).toHaveCount(0); // back to cropping
+  expect(JSON.parse((await req).postData()!).ocr_lines.join(" ")).not.toContain("SAMPLE");
 });
 
-test("unreadable crop", async ({ page }) => {
+test("blank crop is unreadable without sending anything", async ({ page }) => {
+  const requests = watchRequests(page);
   await startGeneral(page);
-  await page.getByRole("button", { name: "+ Add a document" }).click();
-  await page.getByLabel("Choose or take a photo").setInputFiles({
-    name: "tiny.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, 150, 300),
-  });
-  await page.getByRole("button", { name: "Use this crop" }).click();
-  await page.getByRole("button", { name: "Read the text" }).click();
+  await pickAndRead(page, []);
+  await expect(page.locator("[data-error-code=unreadable]")).toBeVisible({ timeout: 45_000 });
+  expect(requests.filter((r) => r.url().includes("/v1/extract"))).toHaveLength(0);
+});
+
+test("server id_number_detected asks for a new crop", async ({ page }) => {
+  await page.route("**/v1/extract", (r) => r.fulfill({
+    status: 422, contentType: "application/json",
+    body: '{"error":{"code":"id_number_detected","message":"x","hint":"y"}}',
+  }));
+  await startGeneral(page);
+  await pickAndRead(page, CARD_LINES);
+  await expect(page.getByTestId("ocr-lines")).toContainText("Ravi", { timeout: 45_000 });
+  await page.getByRole("button", { name: "Send this text" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "I understand" }).click();
-  await expect(page.locator("[data-error-code=unreadable]")).toBeVisible();
+  await expect(page.locator("[data-error-code=id_number_detected]")).toContainText("seems to include an ID number");
+  await expect(page.getByTestId("ocr-lines")).toHaveCount(0); // back to cropping
+});
+
+test("daily_cap_reached (bedrock mode) switches to typed mode; typed checks still work", async ({ page }) => {
+  await page.route("**/v1/extract", (r) => r.fulfill({
+    status: 429, contentType: "application/json",
+    body: '{"error":{"code":"daily_cap_reached","message":"x","hint":"y"}}',
+  }));
+  await startGeneral(page);
+  await pickAndRead(page, CARD_LINES);
+  await expect(page.getByTestId("ocr-lines")).toContainText("Ravi", { timeout: 45_000 });
+  await page.getByRole("button", { name: "Send this text" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "I understand" }).click();
+  await expect(page.getByText(/paused for today/)).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Type it" })).toHaveAttribute("data-state", "active");
+  await expect(page.getByRole("tab", { name: "Photo" })).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel" }).last().click();
+  await addTyped(page, "Aadhaar", "ANITA SINGH", "1990-04-07");
+  await addTyped(page, "Bank passbook", "ANITA KUMARI SINGH", "1990-04-07");
+  await check(page);
+  await expect(page.getByTestId("report-status")).toHaveText("Mismatches found");
 });
 
 test("consent declined sends nothing", async ({ page }) => {
+  const requests = watchRequests(page);
   await startGeneral(page);
-  await page.getByRole("button", { name: "+ Add a document" }).click();
-  await page.getByLabel("Choose or take a photo").setInputFiles({
-    name: "card.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, 900, 600),
-  });
-  await page.getByRole("button", { name: "Use this crop" }).click();
-  let sent = false;
-  page.on("request", (r) => { if (r.url().includes("/v1/extract")) sent = true; });
-  await page.getByRole("button", { name: "Read the text" }).click();
+  await pickAndRead(page, CARD_LINES);
+  await expect(page.getByTestId("ocr-lines")).toContainText("Ravi", { timeout: 45_000 });
+  await page.getByRole("button", { name: "Send this text" }).click();
   await page.getByRole("button", { name: "Not now" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect(sent).toBe(false);
+  expect(requests.filter((r) => r.url().includes("/v1/extract"))).toHaveLength(0);
 });
 
 for (const [name, status, body, code, text] of [

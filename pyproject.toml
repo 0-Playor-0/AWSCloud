@@ -16,7 +16,6 @@ dev = [
   "hypothesis==6.170.15",
   "ruff==0.17.5",
   "boto3==1.44.3",
-  "pillow==13.0.0",
   "cfn-lint==1.60.1",
 ]
 

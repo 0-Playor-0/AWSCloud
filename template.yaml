@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Namma Check API (Phase 2). Region ap-south-1 only.
+Description: Namma Check API. Region ap-south-1 only.
 
 Parameters:
   GitSha:
@@ -11,7 +11,7 @@ Parameters:
     Type: Number
     Default: 300
     MinValue: 0
-    Description: Extraction calls allowed per day (IST). 0 forces typed/sample mode.
+    Description: Paid extraction calls allowed per day (IST). Applies only to a metered extractor (bedrock, not built); client_ocr is never capped.
   ReservedConcurrency:
     Type: Number
     Default: 5
@@ -91,7 +91,7 @@ Resources:
         LogFormat: JSON
       Environment:
         Variables:
-          EXTRACTOR: textract
+          EXTRACTOR: client_ocr
           EXTRACT_DAILY_CAP: !Ref ExtractDailyCap
           TABLE_NAME: !Ref CountersTable
           GIT_SHA: !Ref GitSha
@@ -99,9 +99,6 @@ Resources:
           POWERTOOLS_LOGGER_LOG_EVENT: "false"
       Policies:
         - Statement:
-            - Effect: Allow
-              Action: textract:DetectDocumentText
-              Resource: "*"
             - Effect: Allow
               Action: [dynamodb:UpdateItem, dynamodb:GetItem]
               Resource: !GetAtt CountersTable.Arn

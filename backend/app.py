@@ -1,8 +1,8 @@
 """Lambda entry point: /v1/extract, /v1/compare, /v1/health, /v1/stats.
 
-Privacy (HANDOFF.md section 4): request bodies, OCR text, field values and images are never
-logged or stored. One log line per request carries only: request_id, route, doc_type,
-status, latency_ms, extractor, error_code.
+Privacy (HANDOFF.md section 4): images never reach the server (OCR runs in the browser).
+Request bodies, OCR text and field values are never logged or stored. One log line per
+request carries only: request_id, route, doc_type, status, latency_ms, extractor, error_code.
 """
 
 from __future__ import annotations
@@ -19,16 +19,15 @@ from pydantic import ValidationError
 
 import engine
 
-from . import errors, guard, imaging
+from . import errors, guard
 from .counters import CounterStore, DynamoCounters
 from .errors import ApiError
 from .extractors import Extractor, ExtractorError, ExtractorThrottled, get_extractor
 from .models import CompareRequest, ExtractRequest
 from .parsers import FIELD_NAMES, Fields
 
-MAX_EXTRACT_BODY = 2_200_000
+MAX_EXTRACT_BODY = 32_000  # 40 lines x 120 chars, with room for JSON escapes
 MAX_COMPARE_BODY = 32_000
-MAX_IMAGE_B64_CHARS = 2_100_000
 LOW_CONFIDENCE = 0.8
 
 logger = Logger(service="namma-check", log_uncaught_exceptions=False)
@@ -37,7 +36,7 @@ app = APIGatewayHttpResolver()
 
 @dataclass
 class Settings:
-    extractor: str = field(default_factory=lambda: os.environ.get("EXTRACTOR", "textract"))
+    extractor: str = field(default_factory=lambda: os.environ.get("EXTRACTOR", "client_ocr"))
     daily_cap: int = field(
         default_factory=lambda: int(os.environ.get("EXTRACT_DAILY_CAP", "300"))
     )
@@ -123,26 +122,22 @@ def _fields_response(fields: Fields) -> dict[str, Any]:
 
 @app.post("/v1/extract")
 def extract() -> dict[str, Any]:
-    data = _json_body(MAX_EXTRACT_BODY, errors.image_too_large())
-    req = _validate(ExtractRequest, data)
+    req = _validate(ExtractRequest, _json_body(MAX_EXTRACT_BODY, errors.request_too_large()))
     _log_ctx["doc_type"] = req.doc_type  # validated enum value only
-    if len(req.image_b64) > MAX_IMAGE_B64_CHARS:
-        raise errors.image_too_large()
-    image = imaging.decode_image(req.image_b64)
+    extractor = deps.extractor
+    if extractor.metered:  # the daily cap bounds paid extraction only (bedrock)
+        try:
+            allowed = deps.counters.consume_extraction(deps.settings.daily_cap)
+        except Exception:
+            raise errors.extractor_failed() from None  # fail closed: the cap bounds cost
+        if not allowed:
+            raise errors.daily_cap_reached()
     try:
-        allowed = deps.counters.consume_extraction(deps.settings.daily_cap)
-    except Exception:
-        raise errors.extractor_failed() from None  # fail closed: the cap bounds cost
-    if not allowed:
-        raise errors.daily_cap_reached()
-    try:
-        result = deps.extractor.extract(req.doc_type, image)
+        result = extractor.extract(req.doc_type, req.ocr_lines)
     except ExtractorThrottled:
         raise errors.throttled() from None
     except ExtractorError:
         raise errors.extractor_failed() from None
-    finally:
-        del image
     if guard.contains_id_number(req.doc_type, result.raw_text):
         del result  # discard everything, including parsed fields
         raise errors.id_number_detected()
