@@ -12,6 +12,20 @@ AWS in Sydney and not stored.
 | Counters | DynamoDB on-demand table `nc_counters` | Anonymous aggregate counts only; daily cap for a future metered extractor |
 | Logs | CloudWatch Logs (14-day retention) | Metadata only: request id, route, doc_type, status, latency, extractor, error code |
 | Photo reading | **None on AWS**: Tesseract.js in the browser | The image never leaves the phone |
+| Site hosting | S3 (private, encrypted, public access blocked) | Stores the static build only; reachable only through CloudFront (Origin Access Control) |
+| CDN + HTTPS | CloudFront (PriceClass_200, includes India edges) | Free HTTPS URL, edge caching near users, security headers (CSP, HSTS, frame-deny) |
+| Alerts | CloudWatch alarms + SNS email | Lambda errors, Lambda throttles, API 5xx rate, counter-store failures; metadata only |
+| Cost guard | AWS Budgets | Email alerts at $10, $25, $50 actual spend |
+
+## Cost controls
+
+- API Gateway throttling: 2 requests/s, burst 5 (bare `429` beyond that).
+- Lambda reserved concurrency 5, 512 MB, 20 s timeout (extra load gets `503`, shown as "try again").
+- No paid per-request AI service: OCR runs on the phone. The daily cap stays wired for a future
+  metered extractor (Bedrock, off).
+- CloudFront caches hashed assets and the versioned OCR files for a year, so repeat visits cost
+  almost nothing; `index.html` is revalidated.
+- Logs kept 14 days.
 
 ## Why Textract was removed (2026-11-16)
 

@@ -21,10 +21,6 @@ Parameters:
     Default: 5
     MinValue: 0
     Description: Lambda reserved concurrency. 0 = do not reserve (needed on accounts whose concurrency limit is too low to reserve any).
-  DevOrigin:
-    Type: String
-    Default: ""
-    Description: Optional extra CORS origin for local testing against the deployed API (e.g. http://localhost:5173). Empty in production, so CORS allows only the CloudFront origin.
   AlarmEmail:
     Type: String
     Default: ""
@@ -38,7 +34,6 @@ Parameters:
 
 Conditions:
   ReserveConcurrency: !Not [!Equals [!Ref ReservedConcurrency, 0]]
-  HasDevOrigin: !Not [!Equals [!Ref DevOrigin, ""]]
   HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, ""]]
 
 Rules:
@@ -70,10 +65,7 @@ Resources:
         ThrottlingRateLimit: !Ref ThrottleRate
         ThrottlingBurstLimit: !Ref ThrottleBurst
       CorsConfiguration:
-        AllowOrigins: !If
-          - HasDevOrigin
-          - [!Sub "https://${SiteDistribution.DomainName}", !Ref DevOrigin]
-          - [!Sub "https://${SiteDistribution.DomainName}"]
+        AllowOrigins: [!Sub "https://${SiteDistribution.DomainName}"]  # the site only
         AllowMethods: [GET, POST, OPTIONS]
         AllowHeaders: [content-type]
         MaxAge: 600

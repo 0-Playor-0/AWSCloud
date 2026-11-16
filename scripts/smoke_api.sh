@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Curl every route and every reproducible error code against a deployed API.
-#   scripts/smoke_api.sh https://<api-id>.execute-api.<region>.amazonaws.com
+#   scripts/smoke_api.sh https://<api-id>.execute-api.<region>.amazonaws.com [SiteUrl]
+# SiteUrl (the CloudFront URL) is the only origin CORS should allow.
 # Prints status + body for each case (synthetic data only), then PASS/FAIL per case.
 set -uo pipefail
-API="${1:?usage: scripts/smoke_api.sh <ApiUrl>}"
+API="${1:?usage: scripts/smoke_api.sh <ApiUrl> [SiteUrl]}"
+SITE="${2:-http://localhost:5173}"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 FAILS=0
 
@@ -35,7 +37,11 @@ check request_too_large   413 request_too_large   POST /v1/extract "${J[@]}" -d 
 check invalid_request     400 invalid_request     POST /v1/compare "${J[@]}" -d '{"purpose":"visa","documents":[]}'
 check wrong_content_type  400 invalid_request     POST /v1/compare -H 'content-type: text/plain' -d "$COMPARE"
 check not_found           404 ""                  GET  /v1/nope
-check cors_preflight      204 ""                  OPTIONS /v1/compare -H 'Origin: http://localhost:5173' -H 'Access-Control-Request-Method: POST'
+check cors_preflight      204 ""                  OPTIONS /v1/compare -H "Origin: $SITE" -H 'Access-Control-Request-Method: POST'
+cors_allows() { curl -s -o /dev/null -D - -X OPTIONS "$API/v1/compare" -H "Origin: $1" \
+  -H 'Access-Control-Request-Method: POST' | grep -qi "access-control-allow-origin: $1"; }
+if cors_allows "$SITE"; then echo "cors_site_allowed          PASS"; else echo "cors_site_allowed          FAIL"; FAILS=$((FAILS + 1)); fi
+if cors_allows "https://evil.example"; then echo "cors_other_rejected        FAIL"; FAILS=$((FAILS + 1)); else echo "cors_other_rejected        PASS"; fi
 
 echo "--- throttling burst (expect some 429s) ---"
 for _ in $(seq 1 15); do curl -s -o /dev/null -w '%{http_code} ' "$API/v1/health" & done; wait; echo
