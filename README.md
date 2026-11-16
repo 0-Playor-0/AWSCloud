@@ -84,8 +84,10 @@ Needs an AWS account, the AWS CLI and SAM CLI, and credentials for an IAM user (
    ```bash
    sam build && sam deploy --parameter-overrides GitSha=$(git rev-parse --short HEAD) AlarmEmail=you@example.com
    ```
-   Pass `AlarmEmail` on every deploy: leaving it out removes the alarm topic. If
-   `scripts/preflight.sh` shows a Lambda concurrency limit of 100 or less, add
+   On an existing stack, SAM keeps each parameter's previous value unless you pass it: the
+   template defaults apply only to the first deploy. To change limits later, pass them
+   explicitly, e.g. `ReservedConcurrency=10 ThrottleRate=10 ThrottleBurst=20`. If
+   `scripts/preflight.sh` shows a Lambda concurrency limit of 100 or less, use
    `ReservedConcurrency=0`.
 4. Build and publish the site:
    ```bash

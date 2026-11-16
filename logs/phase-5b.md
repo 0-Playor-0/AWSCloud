@@ -41,3 +41,29 @@
 ## Questions for the architect
 1. Which AWS option (a/b/c) to finish the redeploy?
 2. Which `main` option (a/b/c) for the PR?
+
+# Phase 5b (continued) — Redeploy, live checks, `main` — 2026-11-16
+## AWS
+- `aws sts get-caller-identity`: OK first attempt (IAM user `namma-check-deploy`)
+- `sam build && sam deploy`: first deploy succeeded, but **SAM reused the previous parameter values** (5, 2/5) because the new template defaults apply only to the first deploy of a stack. Redeployed with `ReservedConcurrency=10 ThrottleRate=10 ThrottleBurst=20` passed explicitly (and `AlarmEmail` as a deploy-time parameter only)
+- README corrected: it now says to pass changed limits explicitly. The earlier claim that omitting `AlarmEmail` deletes the alarm topic was wrong: SAM keeps the previous value
+- `scripts/deploy_site.sh`: site rebuilt against the API and published; CloudFront index invalidated
+- Two calls of mine ran without the region script and hit ap-south-1: SCP deny on SNS ListSubscriptions. Re-run in ap-southeast-2 worked. Nothing worked around
+## Confirmed live
+- Lambda reserved concurrency **10**; API `$default` stage throttle **10 req/s, burst 20** (AWS API, after redeploy)
+- Automatic retry is live: the published bundle contains it, and the two "busy … once is retried quietly" e2e tests pass against the public URL
+- Real busy replies carry CORS headers (40-request burst from the site origin: 21×200, 2×429, 17×503, every one with `access-control-allow-origin`), so the browser sees them and retries
+## Tests (public URL https://d3glxkvs4n9ily.cloudfront.net)
+- `scripts/smoke_api.sh <ApiUrl> <SiteUrl>`: 14/14 PASS
+- Playwright: first run 15/19. The 4 failures were "Could not reach the service" on compare during the minutes when the new stage throttle was propagating; sequential calls were briefly getting 429. I couldn't reproduce them after propagation. Re-run: **19/19 passed**
+- Lambda metrics for the 60-request smoke burst: 37 throttles = the 37 API 5xx; 0 errors
+## Branches
+- `main` created from the head of `ccr-5fb7aac1-nt02on` (this commit) and pushed
+- **The GitHub default branch is still `ccr-5fb7aac1-nt02on`** (it was the only branch). Change it in GitHub: repo Settings → General → Default branch → `main`
+## AWS resources and cost so far
+- unchanged set (stack `namma-check`, SAM artifact bucket, budget) · spend **$0.00** actual (AWS Budgets)
+- Alarm email subscription is still **PendingConfirmation**: the confirmation email from AWS SNS must be clicked
+## Open issues
+- Burst 20 is above concurrency 10, so a large burst mostly gets Lambda 503s (17) rather than API 429s (2). The client retries both once, so users see little difference. To make API Gateway shed load first, set burst ≤ concurrency (e.g. burst 10) or concurrency 20
+## Questions for the architect
+1. Keep burst 20 with concurrency 10, or align them (burst 10 or concurrency 20)?
