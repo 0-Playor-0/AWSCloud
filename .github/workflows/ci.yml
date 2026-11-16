@@ -16,3 +16,17 @@ jobs:
         run: pytest --cov=engine --cov=backend --cov-fail-under=90
       - name: SAM template lint
         run: cfn-lint template.yaml
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

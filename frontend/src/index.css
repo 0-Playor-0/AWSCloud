@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Phase 3: functional styling only. Palette from HANDOFF.md section 7 (WCAG AA checked in the log). */
+@theme {
+  --color-paper: #f6f1e7;
+  --color-ink: #14213d;
+  --color-stamp: #c8322b;
+  --color-match: #1f7a4d;
+  --color-amber: #e9a23b;
+  --color-amber-dark: #8a5a00;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
