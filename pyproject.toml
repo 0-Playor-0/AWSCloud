@@ -1,0 +1,30 @@
+[project]
+name = "namma-check"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = ["PyYAML==6.0.3"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.2.0",
+  "pytest-cov==7.1.0",
+  "hypothesis==6.170.15",
+  "ruff==0.17.5",
+]
+
+[tool.setuptools]
+packages = ["engine"]
+
+[tool.setuptools.package-data]
+engine = ["rules.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

@@ -1,0 +1,85 @@
+# Table-driven engine cases. All names and dates are fictional.
+# Each name/dob case is also checked in reverse order (symmetry).
+
+normalize:
+  - [" ravi   kumar ", [RAVI, KUMAR]]
+  - ["R.K. Sharma", [R, K, SHARMA]]
+  - ["Mr. Ravi Kumar", [RAVI, KUMAR]]
+  - ["SMT. SUNITA DEVI", [SUNITA, DEVI]]
+  - ["Dr Mrs Meena Iyer", [MEENA, IYER]]
+  - ["Kumari Anita Singh", [ANITA, SINGH]]
+  - ["Anita Kumari Singh", [ANITA, KUMARI, SINGH]]   # middle KUMARI is a name, not a title
+  - ["SHRI", [SHRI]]                                 # lone honorific-like token kept
+  - ["O'Brien-Nair", [O, BRIEN, NAIR]]
+  - ["...", []]
+
+names:
+  # exact
+  - [RAVI KUMAR, RAVI KUMAR, exact]
+  - ["RAVI  KUMAR ", RAVI KUMAR, exact]
+  - [MURUGAN, MURUGAN, exact]                          # single-name person
+  # format_only: case, dots, spacing, honorifics
+  - [Ravi Kumar, RAVI KUMAR, format_only]
+  - [R.K. SHARMA, R K SHARMA, format_only]
+  - [RK SHARMA, R K SHARMA, format_only]
+  - [RAVIKUMAR, RAVI KUMAR, format_only]
+  - [MR RAVI KUMAR, RAVI KUMAR, format_only]
+  - [SMT. LAKSHMI, LAKSHMI, format_only]
+  - [KUMARI ANITA SINGH, Anita Singh, format_only]
+  # token_order
+  - [RAVI KUMAR, KUMAR RAVI, token_order]
+  - [SHARMA RAJESH KUMAR, RAJESH KUMAR SHARMA, token_order]
+  - [RAVI KUMAR K, K RAVI KUMAR, token_order]          # trailing vs leading initial
+  - [IYER MEENAKSHI, Meenakshi Iyer, token_order]
+  # initials_vs_expanded
+  - [K RAVI, RAVI KUMAR, initials_vs_expanded]
+  - [K. RAVI, RAVI KRISHNAN, initials_vs_expanded]
+  - [R K SHARMA, RAJESH KUMAR SHARMA, initials_vs_expanded]
+  - [R.K. SHARMA, RAJESH KUMAR SHARMA, initials_vs_expanded]
+  - [S RAMESH, RAMESH SUBRAMANIAN, initials_vs_expanded]
+  - [A P J ABDUL KALAM, AVUL PAKIR JAINULABDEEN ABDUL KALAM, initials_vs_expanded]
+  - [RAVI KUMAR K, RAVI KUMAR KRISHNAN, initials_vs_expanded]
+  - [M S DHONI, MAHENDRA SINGH DHONI, initials_vs_expanded]
+  # missing_token
+  - [ANITA SINGH, ANITA KUMARI SINGH, missing_token]
+  - [RAVI, RAVI KUMAR, missing_token]                  # single name vs full name
+  - [PRIYA SHARMA, PRIYA RANI SHARMA, missing_token]
+  - [R SHARMA, RAJESH KUMAR SHARMA, missing_token]     # initial plus a dropped token
+  - [MEENA IYER, MEENA, missing_token]
+  - [SUNITA DEVI, SUNITA DEVI YADAV, missing_token]
+  # spelling_variant
+  - [POOJA SHARMA, PUJA SHARMA, spelling_variant]
+  - [MOHAMMED ALI, MOHAMMAD ALI, spelling_variant]
+  - [LAKSHMI, LAKSMI, spelling_variant]
+  - [LAKSHMI, LAXMI, different]                        # edit distance 3: known gap, see logs/phase-1.md
+  - [SURESH KUMAR, SURESH KUMAAR, spelling_variant]
+  - [VIJAYALAKSHMI R, VIJAYLAKSHMI R, spelling_variant]
+  - [KUMAR RAVI, RAVI KUMARR, spelling_variant]        # order-insensitive alignment
+  # different
+  - [PRIYA SHARMA, PRIYA VERMA, different]             # surname change, edit distance 3
+  - [ANJALI MEHTA, ANJALI KAPOOR, different]           # surname change after marriage
+  - [RAVI KUMAR, SURESH BABU, different]
+  - [K RAVI, R RAVI, different]                        # different initials
+  - [RAM, RAJ, spelling_variant]                       # short token, distance 1, still flagged
+  - [AB, XY, different]
+  - [POOJA SHARMA, PUJA SHARMMA, different]            # two tokens changed
+  # very long names
+  - [VENKATA SATYA NAGA SAI KRISHNA PRASAD RAO, VENKATA SATYA NAGA SAI KRISHNA PRASAD RAO, exact]
+  - [V S N S K PRASAD RAO, VENKATA SATYA NAGA SAI KRISHNA PRASAD RAO, initials_vs_expanded]
+  - [VENKATA SATYA NAGA SAI KRISHNA PRASAD, VENKATA SATYA NAGA SAI KRISHNA PRASAD RAO, missing_token]
+
+dobs:
+  - ["2007-03-14", "2007-03-14", exact]
+  - [" 2007-03-14", "2007-03-14", exact]
+  - ["2007", "2007", exact]
+  - ["2007", "2007-03-14", year_only]
+  - ["2006", "2007-03-14", different]
+  - ["2007-03-04", "2007-04-03", day_month_swapped]
+  - ["2007-03-14", "2007-03-15", off_by_small]
+  - ["2007-03-14", "2007-04-14", off_by_small]
+  - ["2007-03-14", "2008-03-14", off_by_small]
+  - ["2007-03-14", "2008-04-14", different]
+  - ["2007-03-14", "1999-11-02", different]
+  - ["2007-05-05", "2007-05-06", off_by_small]         # same day and month, not a swap
+
+bad_dobs: ["14-03-2007", "2007-02-30", "2007/03/14", "07", "", "2007-13-01"]

@@ -1,0 +1,41 @@
+# Seed rules from HANDOFF.md section 3. Do not add rules without architect approval.
+# verified: true | secondary | unverified. Only true/secondary rules may raise severity.
+# Unverified rules are worded with "may".
+rules:
+  - id: R-AADHAAR-LIMITS
+    applies_to: [aadhaar]
+    statement: >-
+      UIDAI allows the name on Aadhaar to be updated twice in a lifetime, and the date of birth
+      and gender once each. More changes need a special exception process.
+    effect:
+      type: caution_on_change
+      doc: aadhaar
+    source_url: https://uidai.gov.in/en/1045-english-uk/faqs/enrolment-update/myaadhaar-online-update-service/13905-how-many-times-aadhaar-data-can-be-updated.html
+    verified: "true"
+
+  - id: R-EPF-MISMATCH
+    applies_to: [epf_claim]
+    statement: >-
+      EPF claims are commonly rejected when the name, date of birth, Aadhaar or bank details do
+      not match.
+    effect:
+      type: raise_severity
+      purpose: epf_claim
+      field: name
+      involves_doc: aadhaar
+      from: risky
+      to: blocking
+    source_url: https://www.outlookmoney.com/retirement/pension/epf-claim-settlement-why-epfo-rejects-the-claims-and-what-subscribers-can-do
+    verified: secondary
+
+  - id: R-PAN-AADHAAR-LINK
+    applies_to: [pan_aadhaar_link]
+    statement: >-
+      PAN–Aadhaar linking may fail when the name, date of birth or gender differ between the two.
+    effect:
+      type: annotate
+      purpose: pan_aadhaar_link
+      fields: [name, dob, gender]
+      involves_docs: [pan, aadhaar]
+    source_url: null
+    verified: unverified
