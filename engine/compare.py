@@ -11,6 +11,7 @@ from .messages import (
     ACTION_CHOOSE,
     ACTION_CONFIRM_DOB,
     ACTION_CORRECT,
+    CAUTION_CONFIRM_DOB_AADHAAR,
     DISCLAIMER,
     DOC_LABELS,
     EXPLANATIONS,
@@ -222,6 +223,7 @@ def _confirm_steps(docs: list[Doc], year_only_findings: list[dict[str, Any]]) ->
             "doc": d.id,
             "doc_type": d.doc_type,
             "action": ACTION_CONFIRM_DOB.format(doc=DOC_LABELS[d.doc_type]),
+            "caution": CAUTION_CONFIRM_DOB_AADHAAR,  # conditional: confirming is not changing
         }
         for d in targets
     ]
@@ -252,7 +254,7 @@ def _fix_plan(
                 "step": number,
                 "doc": step["doc"],
                 "action": step["action"],
-                "caution": limits.statement if limited else None,
+                "caution": step.get("caution", limits.statement) if limited else None,
                 "source_url": limits.source_url if limited else None,
             }
         )

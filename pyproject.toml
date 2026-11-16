@@ -1,8 +1,13 @@
 [project]
 name = "namma-check"
 version = "0.1.0"
-requires-python = ">=3.13"
-dependencies = ["PyYAML==6.0.3"]
+requires-python = ">=3.14"
+# Runtime deps of the Lambda (engine + backend). Keep in sync with backend/requirements.txt.
+dependencies = [
+  "PyYAML==6.0.3",
+  "aws-lambda-powertools==3.40.0",
+  "pydantic==2.14.3",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -10,21 +15,25 @@ dev = [
   "pytest-cov==7.1.0",
   "hypothesis==6.170.15",
   "ruff==0.17.5",
+  "boto3==1.44.3",
+  "pillow==13.0.0",
+  "cfn-lint==1.60.1",
 ]
 
-[tool.setuptools]
-packages = ["engine"]
+[tool.setuptools.packages.find]
+include = ["engine*", "backend*"]
 
 [tool.setuptools.package-data]
 engine = ["rules.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

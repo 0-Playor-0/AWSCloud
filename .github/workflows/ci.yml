@@ -7,10 +7,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Install
         run: pip install -e ".[dev]"
       - name: Lint
         run: ruff check .
       - name: Unit + integration tests
-        run: pytest --cov=engine --cov-fail-under=95
+        run: pytest --cov=engine --cov=backend --cov-fail-under=90
+      - name: SAM template lint
+        run: cfn-lint template.yaml

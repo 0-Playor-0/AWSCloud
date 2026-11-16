@@ -192,7 +192,13 @@ def test_year_only_never_changed_even_with_full_date_anchor() -> None:
                 {"dob": "pan"})
     (step,) = r["fix_plan"]
     assert step["doc"] == "aadhaar" and step["action"].startswith("Confirm")
-    assert step["caution"] == LIMITS.statement
+    assert step["caution"] == "If you need to correct it, date of birth can be updated only once."
+    assert step["source_url"] == LIMITS.source_url
+
+
+def test_confirm_step_on_non_aadhaar_has_no_caution() -> None:
+    r = compare("general", [doc("pan", dob="2007-03-14"), doc("marksheet10", dob="2007")])
+    assert r["fix_plan"][0]["caution"] is None
 
 
 def test_year_only_with_different_year_is_blocking_change() -> None:

@@ -32,5 +32,8 @@ EXPLANATIONS = {
 }
 
 ACTION_CORRECT = "Correct {field} on your {doc} to match your {anchor}"
+CAUTION_CONFIRM_DOB_AADHAAR = (
+    "If you need to correct it, date of birth can be updated only once."
+)
 ACTION_CONFIRM_DOB = "Confirm your full date of birth on your {doc}; it shows only the year"
 ACTION_CHOOSE = "Decide which document shows your correct {field}, then mark it as correct"
