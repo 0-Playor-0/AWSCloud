@@ -87,6 +87,7 @@ All responses JSON. All errors: `{ "error": { "code": "...", "message": "human r
   "warnings": ["dob_low_confidence"] }
 ```
 Errors: `400 invalid_image`, `413 image_too_large`, `422 id_number_detected` (see 4.3), `422 unreadable`, `429 daily_cap_reached` (hint: use typed mode), `429 throttled`, `502 extractor_failed`.
+All routes may also return: `400 invalid_request` (bad JSON, content-type or schema), `413 request_too_large` (`/v1/compare` body over 32 KB), `404 not_found`, `500 internal_error`. API Gateway's own throttling returns a bare `429` (not this error shape); clients treat it as `throttled`.
 
 `POST /v1/compare`
 ```json
@@ -145,7 +146,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 1. **Crop is mandatory** for photo input. The browser crops to the name / date-of-birth area and re-encodes to JPEG (strips EXIF) before upload. The UI shows the exact image that will be sent. For Aadhaar, show guidance to exclude the number, photo and QR code, and recommend masked Aadhaar.
 2. **No persistence:** images and field values exist only in Lambda memory for the request. No S3 writes, no DynamoDB writes of fields, no temp files left behind.
-3. **ID-number guard:** after OCR, if the text contains a 12-digit Aadhaar-like number (with or without spaces) or a PAN-format string in an Aadhaar/"other" crop, discard everything and return `422 id_number_detected` asking the user to re-crop. Never log the match.
+3. **ID-number guard:** after OCR, discard everything and return `422 id_number_detected` asking the user to re-crop if: in an Aadhaar/"other" crop, the text contains any 12-digit number (with or without spaces) or a PAN-format string; in any other crop, it contains a Verhoeff-valid 12-digit number. Never log or return the match.
 4. **Logging:** never log request bodies, OCR text, field values or images. Log only: request id, route, doc_type, status code, latency, extractor, error code. Disable API Gateway body logging. Add a unit test that fails if a log record contains any field value from the test payload.
 5. **Transport and access:** HTTPS only; CORS restricted to the CloudFront origin (plus localhost in dev); S3 bucket private.
 6. **Bedrock (if enabled):** no model invocation logging; in-region or India-only profile only.

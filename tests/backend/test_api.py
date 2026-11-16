@@ -104,6 +104,33 @@ def test_422_id_number_detected_discards_fields(fakes, call) -> None:
     assert "RAVI" not in json.dumps(body)
 
 
+PASSBOOK_LINES = [OcrLine("Customer Name: RAVI KUMAR", 0.95), OcrLine("DOB: 14/03/2007", 0.9)]
+
+
+@pytest.mark.parametrize(
+    "doc_type,number,status",
+    [
+        ("aadhaar", "9999 9999 9998", 422),     # any 12 digits on an Aadhaar crop
+        ("other", "1111 1111 1111", 422),
+        ("passbook", "9999 9999 9999", 422),    # Verhoeff-valid: looks like Aadhaar
+        ("passbook", "9999 9999 9998", 200),    # plain 12-digit account number
+        ("marksheet10", "1111 1111 1115", 422),
+        ("marksheet10", "1111 1111 1111", 200),
+    ],
+)
+def test_id_guard_by_doc_type_never_echoes_digits(fakes, call, logbuf, doc_type: str,
+                                                  number: str, status: int) -> None:
+    _, extractor = fakes
+    extractor.lines = [*PASSBOOK_LINES, OcrLine(f"A/c {number}", 0.99)]
+    got_status, body = _extract(call, doc_type=doc_type)
+    assert got_status == status
+    if status == 422:
+        assert body["error"]["code"] == "id_number_detected"
+    digits = number.replace(" ", "")
+    for blob in (json.dumps(body), logbuf.getvalue()):
+        assert number not in blob and digits not in blob and number[:4] + " " not in blob
+
+
 def test_422_unreadable(fakes, call) -> None:
     _, extractor = fakes
     extractor.lines = [OcrLine("~ | 12 ..", 0.3), OcrLine("--", 0.2)]
