@@ -29,9 +29,16 @@ export function watchRequests(page: Page): Request[] {
 
 const IMAGE_MARKERS = [/data:image\//, /\/9j\//, /iVBORw0KGgo/, /[A-Za-z0-9+/=]{400,}/];
 
+/** Our own origins: the site, plus the API when it is deployed separately (E2E_API_URL). */
+export function ownOrigins(siteOrigin: string): string[] {
+  const api = process.env.E2E_API_URL;
+  return api ? [siteOrigin, new URL(api).origin] : [siteOrigin];
+}
+
 export function assertNoImageData(requests: Request[], origin: string) {
+  const allowed = ownOrigins(origin);
   for (const r of requests) {
-    expect(new URL(r.url()).origin, `third-party request: ${r.url()}`).toBe(origin);
+    expect(allowed, `third-party request: ${r.url()}`).toContain(new URL(r.url()).origin);
     const body = r.postData();
     if (!body) continue;
     expect(body.length, `large request body to ${r.url()}`).toBeLessThan(8_000);
