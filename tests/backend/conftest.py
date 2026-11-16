@@ -80,7 +80,9 @@ class FakeMeteredExtractor:
         self.error: type[Exception] | None = None
         self.calls = 0
 
-    def extract(self, doc_type: str, lines: list[str]) -> Extraction:
+    def extract(
+        self, doc_type: str, lines: list[str], confidence: list[float] | None = None
+    ) -> Extraction:
         self.calls += 1
         if self.error:
             raise self.error("simulated")

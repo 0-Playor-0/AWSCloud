@@ -106,7 +106,7 @@ def _validate[M](model: type[M], data: dict[str, Any]) -> M:
         raise errors.invalid_request(f"Invalid or missing: {', '.join(where)}.") from None
 
 
-def _fields_response(fields: Fields) -> dict[str, Any]:
+def _fields_response(fields: Fields, low_confidence: frozenset[str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     warnings: list[str] = []
     for name in FIELD_NAMES:
@@ -115,7 +115,7 @@ def _fields_response(fields: Fields) -> dict[str, Any]:
         if name == "dob":
             entry["precision"] = fv.precision
         out[name] = entry
-        if fv.value is not None and fv.confidence < LOW_CONFIDENCE:
+        if fv.value is not None and (fv.confidence < LOW_CONFIDENCE or name in low_confidence):
             warnings.append(f"{name}_low_confidence")
     return {"fields": out, "warnings": warnings}
 
@@ -133,7 +133,7 @@ def extract() -> dict[str, Any]:
         if not allowed:
             raise errors.daily_cap_reached()
     try:
-        result = extractor.extract(req.doc_type, req.ocr_lines)
+        result = extractor.extract(req.doc_type, req.ocr_lines, req.ocr_confidence)
     except ExtractorThrottled:
         raise errors.throttled() from None
     except ExtractorError:
@@ -143,7 +143,7 @@ def extract() -> dict[str, Any]:
         raise errors.id_number_detected()
     if result.fields.empty():
         raise errors.unreadable()
-    return _fields_response(result.fields)
+    return _fields_response(result.fields, result.low_confidence)
 
 
 @app.post("/v1/compare")

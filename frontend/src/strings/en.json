@@ -183,5 +183,10 @@
   "receipt.title": "Check receipt",
   "receipt.purpose": "Purpose",
   "receipt.documents": "Documents",
-  "receipt.diffLegend": "Highlighted letters differ from the first document."
+  "receipt.diffLegend": "Highlighted letters differ from the first document.",
+  "photo.downloadNotice": "Reading photos on your phone needs a one-time download of about {mb} MB. On a slow connection this can take a minute. You can type the details instead.",
+  "photo.useTyped": "Type it instead",
+  "photo.downloadAndRead": "Download (about {mb} MB, one time) and read",
+  "photo.downloading": "Downloading the text reader (one time)…",
+  "photo.downloadDetail": "{done} of {total} MB"
 }

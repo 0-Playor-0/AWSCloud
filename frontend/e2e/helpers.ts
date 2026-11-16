@@ -63,7 +63,7 @@ export async function pickAndRead(page: Page, lines: string[], docType = "Aadhaa
   });
   // Zoom out fully is the default; a 4:3 crop keeps the whole synthetic card.
   await page.getByRole("button", { name: "4 : 3" }).click();
-  await page.getByRole("button", { name: "Read this crop" }).click();
+  await page.getByRole("button", { name: /Read this crop|and read$/ }).click();
 }
 
 export async function check(page: Page) {

@@ -51,7 +51,7 @@ test("photo flow: on-device OCR, numbers stripped, consent, text only sent", asy
   const extractReq = page.waitForRequest("**/v1/extract");
   await dialog.getByRole("button", { name: "I understand" }).click();
   const body = JSON.parse((await extractReq).postData()!);
-  expect(Object.keys(body).sort()).toEqual(["doc_type", "ocr_lines"]);
+  expect(Object.keys(body).sort()).toEqual(["doc_type", "ocr_confidence", "ocr_lines"]);
   expect(body.ocr_lines.join(" ")).not.toMatch(/\d{9,}|\d{4}\s\d{4}\s\d{4}/);
 
   await expect(page.getByText("Check what we read.")).toBeVisible();
@@ -69,6 +69,35 @@ test("photo flow: on-device OCR, numbers stripped, consent, text only sent", asy
   await expect(page.getByTestId("report-status")).not.toBeEmpty();
 
   assertNoImageData(requests, new URL(baseURL!).origin);
+});
+
+test("first OCR use: size notice, download progress, typed alternative", async ({ page }) => {
+  await startGeneral(page);
+  await page.getByRole("button", { name: "+ Add a document" }).click();
+  const notice = page.getByTestId("ocr-download-notice");
+  await expect(notice).toContainText("one-time download of about 7 MB");
+  await notice.getByRole("button", { name: "Type it instead" }).click();
+  await expect(page.getByRole("tab", { name: "Type it" })).toHaveAttribute("data-state", "active");
+
+  await page.getByRole("tab", { name: "Photo" }).click();
+  const { syntheticJpeg } = await import("./helpers");
+  await page.getByLabel("Choose or take a photo").setInputFiles({
+    name: "card.jpg", mimeType: "image/jpeg", buffer: await syntheticJpeg(page, CARD_LINES),
+  });
+  await page.getByRole("button", { name: "4 : 3" }).click();
+  const ocrFiles: string[] = [];
+  page.on("request", (r) => { if (r.url().includes("/ocr/")) ocrFiles.push(new URL(r.url()).pathname); });
+  await page.getByRole("button", { name: "Download (about 7 MB, one time) and read" }).click();
+  await expect(page.getByTestId("ocr-progress")).toContainText(/Downloading|Reading/);
+  await expect(page.getByTestId("ocr-lines")).toContainText("Ravi", { timeout: 45_000 });
+  expect(ocrFiles.some((f) => /\/ocr\/t[\d.]+-c[\d.]+-e[\d.]+\/lang\/eng\.traineddata\.gz$/.test(f))).toBe(true);
+
+  const req = page.waitForRequest("**/v1/extract");
+  await page.getByRole("button", { name: "Send this text" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "I understand" }).click();
+  const body = JSON.parse((await req).postData()!);
+  expect(body.ocr_confidence).toHaveLength(body.ocr_lines.length);
+  expect(body.ocr_confidence.every((c: number) => c >= 0 && c <= 1)).toBe(true);
 });
 
 test("unticked lines are not sent", async ({ page }) => {

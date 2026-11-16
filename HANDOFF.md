@@ -75,7 +75,8 @@ All responses JSON. All errors: `{ "error": { "code": "...", "message": "human r
 `POST /v1/extract`
 ```json
 { "doc_type": "aadhaar|pan|marksheet10|passport|passbook|other",
-  "ocr_lines": ["<text line read on the device>", "..."] }
+  "ocr_lines": ["<text line read on the device>", "..."],
+  "ocr_confidence": [0.93, 0.71] }
 ```
 → `200`
 ```json
@@ -85,7 +86,7 @@ All responses JSON. All errors: `{ "error": { "code": "...", "message": "human r
               "gender": {"value": "M", "confidence": 0.9} },
   "warnings": ["dob_low_confidence"] }
 ```
-`ocr_lines`: 1–40 strings, each at most 120 characters. Images are not accepted.
+`ocr_lines`: 1–40 strings, each at most 120 characters. `ocr_confidence` (optional): the device's OCR confidence per line, 0–1, same length as `ocr_lines`; used only to add `<field>_low_confidence` warnings for fields read from lines under 0.75 (reported field confidences are unchanged). Images are not accepted.
 Errors: `422 id_number_detected` (see 4.3), `422 unreadable`, `429 throttled`; bedrock mode only: `429 daily_cap_reached` (hint: use typed mode), `502 extractor_failed`.
 All routes may also return: `400 invalid_request` (bad JSON, content-type or schema), `413 request_too_large` (`/v1/compare` body over 32 KB), `404 not_found`, `500 internal_error`. API Gateway's own throttling returns a bare `429` (not this error shape); clients treat it as `throttled`.
 
@@ -161,7 +162,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 - Lambda: reserved concurrency 5, timeout 20 s, memory 512 MB (tune and report).
 - Daily extraction cap in DynamoDB (`EXTRACT_DAILY_CAP`, default 300) applies only to the metered `bedrock` extractor; `client_ocr` makes no paid call and is bounded by throttling. When reached: `429 daily_cap_reached`; the frontend switches to typed mode automatically. `/v1/compare` is never capped beyond throttling (it costs almost nothing).
 - Input validation: content-type, base64 validity, JPEG magic bytes, decoded size, pixel dimensions, field lengths, date formats, 2–6 documents.
-- Frontend: OCR assets (~7 MB, cached) load only when photo mode is used; retry once on 502; clear messages for every error code; works on slow 4G.
+- Frontend: OCR assets (~7 MB) load only when photo mode is used, after a notice ("about 7 MB, one time") with download progress and a typed-mode alternative; they live under a versioned path `/ocr/<versions>/` and are served with a one-year immutable cache header; retry once on 502; clear messages for every error code; works on slow 4G.
 - Budgets: AWS Budgets alerts at $10, $25, $50 actual spend (email supplied by the human). CloudWatch alarm on Lambda errors and on 5xx rate.
 - Graceful degradation order: on-device OCR (Bedrock only if ever enabled) → typed mode → sample mode. The site must remain useful at every level.
 

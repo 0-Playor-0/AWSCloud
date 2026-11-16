@@ -18,6 +18,7 @@ from ..parsers import Fields
 class Extraction:
     raw_text: str  # held in memory only, for the ID-number guard; never logged or returned
     fields: Fields
+    low_confidence: frozenset[str] = frozenset()  # field names read from low-confidence lines
 
 
 class ExtractorError(Exception):
@@ -32,7 +33,9 @@ class Extractor(Protocol):
     name: str
     metered: bool  # True when each call costs money: the daily cap applies
 
-    def extract(self, doc_type: str, lines: list[str]) -> Extraction: ...
+    def extract(
+        self, doc_type: str, lines: list[str], confidence: list[float] | None = None
+    ) -> Extraction: ...
 
 
 def get_extractor(name: str) -> Extractor:

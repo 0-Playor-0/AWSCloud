@@ -57,6 +57,35 @@ def test_extract_low_confidence_warning(fakes, call) -> None:
     assert status == 200 and "dob_low_confidence" in body["warnings"], body
 
 
+@pytest.mark.parametrize(
+    "confidence,warnings",
+    [
+        (None, []),                       # optional: absent -> no device-based warnings
+        ([0.95, 0.95, 0.95], []),
+        ([0.95, 0.74, 0.95], ["dob_low_confidence"]),        # DOB line under 0.75
+        ([0.5, 0.95, 0.75], ["name_low_confidence"]),        # 0.75 itself is not low
+        ([0.1, 0.1, 0.1], ["name_low_confidence", "dob_low_confidence", "gender_low_confidence"]),
+    ],
+)
+def test_extract_device_confidence_only_drives_warnings(fakes, call, confidence, warnings) -> None:
+    body = {"doc_type": "aadhaar", "ocr_lines": AADHAAR_LINES}
+    if confidence is not None:
+        body["ocr_confidence"] = confidence
+    status, out = call("POST", "/v1/extract", body)
+    assert status == 200 and out["warnings"] == warnings
+    # reported confidences are unchanged by the device values
+    assert out["fields"]["name"]["confidence"] == 0.9 and out["fields"]["dob"]["confidence"] == 0.9
+
+
+@pytest.mark.parametrize(
+    "confidence",
+    [[0.9], [0.9, 0.9, 0.9, 0.9], [0.9, 1.5, 0.9], [0.9, -0.1, 0.9], ["x", 0.9, 0.9]],
+)
+def test_extract_bad_confidence_is_invalid(fakes, call, confidence) -> None:
+    body = {"doc_type": "aadhaar", "ocr_lines": AADHAAR_LINES, "ocr_confidence": confidence}
+    _assert_error(call("POST", "/v1/extract", body), 400, "invalid_request")
+
+
 def test_extract_client_ocr_ignores_cap(fakes, call) -> None:
     from backend import app as app_module
 

@@ -8,12 +8,14 @@ export const MAX_LINE_CHARS = 120;
 const GROUPED_12 = /\d{4}[\s-]+\d{4}[\s-]+\d{4}/g; // 4-4-4, spaces or hyphens
 const LONG_RUN = /\d{9,}/g;
 
+import type { OcrLine } from "./ocr";
+
 export interface SanitizedText {
-  lines: string[];
+  lines: OcrLine[];
   removedNumbers: number;
 }
 
-export function sanitizeLines(raw: string[]): SanitizedText {
+export function sanitizeLines(raw: OcrLine[]): SanitizedText {
   let removedNumbers = 0;
   const strip = (s: string, re: RegExp) =>
     s.replace(re, () => {
@@ -21,8 +23,11 @@ export function sanitizeLines(raw: string[]): SanitizedText {
       return " ";
     });
   const lines = raw
-    .map((l) => strip(strip(l, GROUPED_12), LONG_RUN).replace(/\s+/g, " ").trim().slice(0, MAX_LINE_CHARS))
-    .filter((l) => l.length > 0)
+    .map((l) => ({
+      ...l,
+      text: strip(strip(l.text, GROUPED_12), LONG_RUN).replace(/\s+/g, " ").trim().slice(0, MAX_LINE_CHARS),
+    }))
+    .filter((l) => l.text.length > 0)
     .slice(0, MAX_LINES);
   return { lines, removedNumbers };
 }

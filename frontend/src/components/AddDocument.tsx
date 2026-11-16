@@ -88,7 +88,8 @@ export function AddDocument({ photoOff, consented, onConsent, onCapReached, onAd
             )}
             <TabsContent value="photo">
               <PhotoInput key={docType} docType={docType} consented={consented} onConsent={onConsent}
-                onCapReached={capReached} onExtracted={(r) => setExtracted(fromExtract(r))} />
+                onCapReached={capReached} onExtracted={(r) => setExtracted(fromExtract(r))}
+                onUseTyped={() => setMode("typed")} />
             </TabsContent>
             <TabsContent value="typed">
               <FieldForm key={docType} title={t("fields.typeTitle")} submitLabel={t("fields.save")}

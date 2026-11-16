@@ -10,3 +10,18 @@ site must not be stronger than the source. Reviewed by: (pending human review).
 | F-PAN-AADHAAR | PAN–Aadhaar linking may fail when name, date of birth or gender differ. | Candidate pages (not yet read): Income Tax e-filing FAQ, UIDAI PAN–Aadhaar FAQ (see logs/phase-1.md) | unverified: site says "may" |
 
 No counts or percentages are shown on the site until a primary source for them is added here.
+
+## Wordmark (footer)
+
+Config: `frontend/src/lib/wordmark.ts` (one list; `enabled` switches a script off, `verified`
+records a native-speaker check). "Namma" is transliterated, not translated, because it is the
+product name.
+
+| Script | Text | Status |
+|---|---|---|
+| Kannada | ನಮ್ಮ ಚೆಕ್ | **unverified** |
+| Tamil | நம்ம செக் | **unverified** |
+| Telugu | నమ్మ చెక్ | **unverified** |
+| Malayalam | നമ്മ ചെക്ക് | **unverified** |
+| Devanagari | नम्मा चेक | **unverified** |
+| Bengali | নম্মা চেক | **unverified** |

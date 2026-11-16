@@ -1,3 +1,4 @@
+import type { OcrLine } from "./ocr";
 import type { Anchor, ApiErrorBody, CompareResponse, DocumentEntry, DocType, ExtractResponse, Purpose } from "./types";
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorBody; status: number };
@@ -61,8 +62,14 @@ const validCompare = (b: unknown) =>
   isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan);
 
 /** POST /v1/extract with on-device OCR text only; retries once on 502 (HANDOFF.md section 5). */
-export async function extract(docType: DocType, ocrLines: string[]): Promise<ApiResult<ExtractResponse>> {
-  const init = postJson({ doc_type: docType, ocr_lines: ocrLines });
+export async function extract(docType: DocType, lines: OcrLine[]): Promise<ApiResult<ExtractResponse>> {
+  const confidence = lines.map((l) => l.confidence);
+  const init = postJson({
+    doc_type: docType,
+    ocr_lines: lines.map((l) => l.text),
+    // only when every line has one (contract: same length as ocr_lines)
+    ...(confidence.every((c) => c !== null) ? { ocr_confidence: confidence.map((c) => Math.round(c * 100) / 100) } : {}),
+  });
   const first = await request<ExtractResponse>("/v1/extract", init, validExtract);
   if (first.ok || first.status !== 502) return first;
   return request<ExtractResponse>("/v1/extract", init, validExtract);

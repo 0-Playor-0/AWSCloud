@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 DocType = Literal["aadhaar", "pan", "marksheet10", "passport", "passbook", "other"]
 Purpose = Literal["general", "pan_aadhaar_link", "epf_claim"]
@@ -23,6 +23,14 @@ class ExtractRequest(_Strict):
     ocr_lines: list[Annotated[str, Field(max_length=MAX_OCR_LINE_CHARS)]] = Field(
         min_length=1, max_length=MAX_OCR_LINES
     )
+    # Optional on-device OCR confidence per line (0..1), same order and length as ocr_lines.
+    ocr_confidence: list[Annotated[float, Field(ge=0, le=1)]] | None = None
+
+    @model_validator(mode="after")
+    def _confidence_matches_lines(self) -> ExtractRequest:
+        if self.ocr_confidence is not None and len(self.ocr_confidence) != len(self.ocr_lines):
+            raise ValueError("ocr_confidence must have one value per line")
+        return self
 
 
 class CompareFields(_Strict):

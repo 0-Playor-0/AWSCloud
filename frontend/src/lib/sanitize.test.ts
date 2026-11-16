@@ -17,14 +17,14 @@ describe("sanitizeLines", () => {
     ["XXXX XXXX 9999", "XXXX XXXX 9999", 0], // masked Aadhaar
     ["  RAVI   KUMAR  ", "RAVI KUMAR", 0],
   ])("%s → %s", (input, out, removed) => {
-    const r = sanitizeLines([input]);
-    expect(r.lines).toEqual(out ? [out] : []);
+    const r = sanitizeLines([{ text: input, confidence: 0.8 }]);
+    expect(r.lines).toEqual(out ? [{ text: out, confidence: 0.8 }] : []);
     expect(r.removedNumbers).toBe(removed);
   });
 
   it("drops empty lines and enforces the contract limits", () => {
-    const r = sanitizeLines(["", "  ", ...Array.from({ length: 50 }, () => "x".repeat(200))]);
+    const r = sanitizeLines(["", "  ", ...Array.from({ length: 50 }, () => "x".repeat(200))].map((text) => ({ text, confidence: null })));
     expect(r.lines).toHaveLength(MAX_LINES);
-    expect(r.lines.every((l) => l.length === MAX_LINE_CHARS)).toBe(true);
+    expect(r.lines.every((l) => l.text.length === MAX_LINE_CHARS && l.confidence === null)).toBe(true);
   });
 });

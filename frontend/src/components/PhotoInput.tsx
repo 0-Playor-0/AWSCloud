@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { extract } from "@/lib/api";
 import { describeError, type ShownError } from "@/lib/errors";
 import { cropImage, type CroppedImage } from "@/lib/image";
-import { readLines } from "@/lib/ocr";
+import { downloadOcr, OCR_DOWNLOAD_MB, ocrAssetsCached, readLines, type OcrLine } from "@/lib/ocr";
 import { sanitizeLines } from "@/lib/sanitize";
 import { t } from "@/lib/strings";
 import type { DocType, ExtractResponse } from "@/lib/types";
@@ -20,10 +20,19 @@ interface Props {
   onConsent: () => void;
   onExtracted: (res: ExtractResponse) => void;
   onCapReached: () => void;
+  onUseTyped: () => void;
 }
 
+interface Busy {
+  phase: "download" | "read";
+  percent: number;
+  detail?: string;
+}
+
+const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+
 interface ReadText {
-  lines: string[];
+  lines: OcrLine[];
   keep: boolean[];
   removedNumbers: number;
 }
@@ -33,7 +42,7 @@ const ASPECTS = [
   { label: "4 : 3", value: 4 / 3 },
 ];
 
-export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapReached }: Props) {
+export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapReached, onUseTyped }: Props) {
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -41,10 +50,19 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
   const [area, setArea] = useState<Area | null>(null);
   const [cropped, setCropped] = useState<CroppedImage | null>(null);
   const [text, setText] = useState<ReadText | null>(null);
-  const [progress, setProgress] = useState<number | null>(null); // on-device reading, 0..100
+  const [progress, setProgress] = useState<Busy | null>(null);
+  const [ocrCached, setOcrCached] = useState<boolean | null>(null); // null = not known yet
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
   const [askConsent, setAskConsent] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    ocrAssetsCached().then((c) => live && setOcrCached(c));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Free object URLs (the photo and the crop) when replaced or on unmount.
   useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
@@ -71,13 +89,19 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
   const readCrop = async () => {
     if (!src || !area) return;
     setError(null);
-    setProgress(0);
     try {
       const img = await cropImage(src, area);
       setCropped(img);
-      const raw = await readLines(img.blob, (p) => {
-        if (p.status === "recognizing text") setProgress(Math.round(p.progress * 100));
-      });
+      if (!ocrCached) {
+        setProgress({ phase: "download", percent: 0 });
+        await downloadOcr((loaded, total) =>
+          setProgress({ phase: "download", percent: Math.round((loaded / total) * 100),
+            detail: t("photo.downloadDetail", { done: mb(loaded), total: mb(total) }) }),
+        );
+        setOcrCached(true);
+      }
+      setProgress({ phase: "read", percent: 0 });
+      const raw = await readLines(img.blob, (p) => setProgress({ phase: "read", percent: Math.round(p * 100) }));
       const clean = sanitizeLines(raw);
       if (clean.lines.length === 0) {
         setError(describeError({ code: "unreadable", message: "", hint: "" }));
@@ -114,6 +138,13 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
         {docType === "aadhaar" && <p className="mt-2 font-semibold">{t("photo.aadhaarGuidance")}</p>}
       </Alert>
 
+      {ocrCached === false && !progress && (
+        <Alert variant="warning" data-testid="ocr-download-notice">
+          <p>{t("photo.downloadNotice", { mb: OCR_DOWNLOAD_MB })}</p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={onUseTyped}>{t("photo.useTyped")}</Button>
+        </Alert>
+      )}
+
       {!cropped && (
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("photo.pick")}</span>
@@ -141,7 +172,9 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
               ))}
             </div>
           </div>
-          <Button onClick={readCrop} disabled={!area || busy}>{t("photo.useCrop")}</Button>
+          <Button onClick={readCrop} disabled={!area || busy || ocrCached === null}>
+            {ocrCached === false ? t("photo.downloadAndRead", { mb: OCR_DOWNLOAD_MB }) : t("photo.useCrop")}
+          </Button>
         </>
       )}
 
@@ -154,9 +187,11 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
       )}
 
       {progress !== null && (
-        <div className="flex flex-col gap-1" role="status">
-          <p className="text-sm">{t("photo.reading")}</p>
-          <Progress value={progress} aria-label={t("photo.reading")} />
+        <div className="flex flex-col gap-1" role="status" data-testid="ocr-progress">
+          <p className="text-sm">{t(progress.phase === "download" ? "photo.downloading" : "photo.reading")}</p>
+          <Progress value={progress.percent}
+            aria-label={t(progress.phase === "download" ? "photo.downloading" : "photo.reading")} />
+          {progress.detail && <p className="font-mono text-xs">{progress.detail}</p>}
         </div>
       )}
 
@@ -173,7 +208,7 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
                 <label className="flex min-h-11 items-center gap-3 rounded border border-ink/15 bg-white px-3">
                   <input type="checkbox" className="size-5 shrink-0" checked={text.keep[i]}
                     onChange={(e) => setText({ ...text, keep: text.keep.map((k, j) => (j === i ? e.target.checked : k)) })} />
-                  <span className={`break-all font-mono text-sm ${text.keep[i] ? "" : "text-ink/70 line-through"}`}>{line}</span>
+                  <span className={`break-all font-mono text-sm ${text.keep[i] ? "" : "text-ink/70 line-through"}`}>{line.text}</span>
                 </label>
               </li>
             ))}
