@@ -9,6 +9,7 @@ from typing import Any
 from . import dates, names
 from .messages import (
     ACTION_CHOOSE,
+    ACTION_CONFIRM_DOB,
     ACTION_CORRECT,
     DISCLAIMER,
     DOC_LABELS,
@@ -182,13 +183,14 @@ def _finding(field: str, a: Doc, b: Doc, result: Assessment) -> dict[str, Any]:
     }
 
 
-def _fix_steps(
+def _change_steps(
     purpose: str,
     field: str,
     docs: list[Doc],
     anchor_doc: Doc | None,
     rules: dict[str, Rule],
 ) -> list[dict[str, Any]]:
+    """Steps that change documents to match the anchor. Year-only DOBs are never changed."""
     label = FIELD_LABELS[field]
     if anchor_doc is None:
         return [{"doc": None, "action": ACTION_CHOOSE.format(field=label)}]
@@ -197,7 +199,7 @@ def _fix_steps(
         if doc is anchor_doc:
             continue
         result = assess(purpose, field, anchor_doc, doc, rules)
-        if result is None or result.severity not in ACTIONABLE:
+        if result is None or result.severity not in ACTIONABLE or result.kind == "year_only":
             continue
         action = ACTION_CORRECT.format(
             field=label, doc=DOC_LABELS[doc.doc_type], anchor=DOC_LABELS[anchor_doc.doc_type]
@@ -206,16 +208,39 @@ def _fix_steps(
     return steps
 
 
+def _confirm_steps(docs: list[Doc], year_only_findings: list[dict[str, Any]]) -> list[dict]:
+    """For year-only DOBs with a matching year: confirm the full date on that record."""
+    by_id = {d.id: d for d in docs}
+    targets: list[Doc] = []
+    for finding in year_only_findings:
+        for doc_id in finding["docs"]:
+            doc = by_id[doc_id]
+            if dates.parse(doc.fields["dob"] or "").year_only and doc not in targets:
+                targets.append(doc)
+    return [
+        {
+            "doc": d.id,
+            "doc_type": d.doc_type,
+            "action": ACTION_CONFIRM_DOB.format(doc=DOC_LABELS[d.doc_type]),
+        }
+        for d in targets
+    ]
+
+
 def _fix_plan(
     purpose: str,
     docs: list[Doc],
     anchor: dict[str, Any],
-    actionable_fields: list[str],
+    findings: list[dict[str, Any]],
     rules: dict[str, Rule],
 ) -> list[dict[str, Any]]:
     steps: list[dict[str, Any]] = []
-    for field in actionable_fields:
-        steps.extend(_fix_steps(purpose, field, docs, _anchor_doc(docs, anchor, field), rules))
+    for field in FIELDS:
+        actionable = [f for f in findings if f["field"] == field and f["severity"] in ACTIONABLE]
+        if any(f["kind"] != "year_only" for f in actionable):
+            anchor_doc = _anchor_doc(docs, anchor, field)
+            steps.extend(_change_steps(purpose, field, docs, anchor_doc, rules))
+        steps.extend(_confirm_steps(docs, [f for f in actionable if f["kind"] == "year_only"]))
     # Documents with no update limits first; Aadhaar (limited updates) last. Stable otherwise.
     steps.sort(key=lambda s: s.get("doc_type") in LIMITED_DOCS)
     limits = rules["R-AADHAAR-LIMITS"]
@@ -248,17 +273,12 @@ def compare(
     docs = _parse_documents(documents)
 
     findings: list[dict[str, Any]] = []
-    actionable_fields: list[str] = []
     for field in FIELDS:
-        anchor_doc = _anchor_doc(docs, anchor, field)
-        field_findings = []
-        for a, b in _pairs(docs, anchor_doc):
+        for a, b in _pairs(docs, _anchor_doc(docs, anchor, field)):
             result = assess(purpose, field, a, b, rules)
             if result is not None:
-                field_findings.append(_finding(field, a, b, result))
-        findings.extend(field_findings)
-        if any(f["severity"] in ACTIONABLE for f in field_findings):
-            actionable_fields.append(field)
+                findings.append(_finding(field, a, b, result))
+    plan = _fix_plan(purpose, docs, anchor, findings, rules)
 
     findings.sort(key=lambda f: SEVERITY_RANK[f["severity"]])
     counts = {s: sum(f["severity"] == s for f in findings) for s in SEVERITY_RANK}
@@ -272,6 +292,6 @@ def compare(
     return {
         "summary": {"status": status, "counts": counts},
         "findings": findings,
-        "fix_plan": _fix_plan(purpose, docs, anchor, actionable_fields, rules),
+        "fix_plan": plan,
         "disclaimer": DISCLAIMER,
     }

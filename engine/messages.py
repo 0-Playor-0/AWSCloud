@@ -32,4 +32,5 @@ EXPLANATIONS = {
 }
 
 ACTION_CORRECT = "Correct {field} on your {doc} to match your {anchor}"
+ACTION_CONFIRM_DOB = "Confirm your full date of birth on your {doc}; it shows only the year"
 ACTION_CHOOSE = "Decide which document shows your correct {field}, then mark it as correct"

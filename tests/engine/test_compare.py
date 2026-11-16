@@ -177,6 +177,42 @@ def test_fix_plan_mixed_fields_orders_unlimited_docs_first() -> None:
     assert [(s["doc"], s["step"]) for s in r["fix_plan"]] == [("marksheet10", 1), ("aadhaar", 2)]
 
 
+def test_year_only_with_matching_year_asks_to_confirm_not_change() -> None:
+    r = compare("general", [doc("pan", dob="2007-03-14"), doc("marksheet10", dob="2007")])
+    (finding,) = r["findings"]
+    assert finding["kind"] == "year_only" and finding["severity"] == "risky"
+    (step,) = r["fix_plan"]  # no "decide which document" step: nothing needs changing
+    assert step["doc"] == "marksheet10"
+    assert step["action"].startswith("Confirm your full date of birth")
+    assert "Correct" not in step["action"]
+
+
+def test_year_only_never_changed_even_with_full_date_anchor() -> None:
+    r = compare("general", [doc("pan", dob="2007-03-14"), doc("aadhaar", dob="2007")],
+                {"dob": "pan"})
+    (step,) = r["fix_plan"]
+    assert step["doc"] == "aadhaar" and step["action"].startswith("Confirm")
+    assert step["caution"] == LIMITS.statement
+
+
+def test_year_only_with_different_year_is_blocking_change() -> None:
+    r = compare("general", [doc("pan", dob="2007-03-14"), doc("marksheet10", dob="2006")],
+                {"dob": "pan"})
+    assert r["findings"][0]["kind"] == "different"
+    assert r["findings"][0]["severity"] == "blocking"
+    assert [s["action"] for s in r["fix_plan"]] == [
+        "Correct date of birth on your Class 10 marksheet to match your PAN card"
+    ]
+
+
+def test_year_only_plus_real_dob_mismatch() -> None:
+    r = compare("general", [doc("pan", dob="2007-03-14"), doc("passport", dob="2007-03-15"),
+                            doc("marksheet10", dob="2007")], {"dob": "pan"})
+    assert [(s["doc"], s["action"].split()[0]) for s in r["fix_plan"]] == [
+        ("passport", "Correct"), ("marksheet10", "Confirm")
+    ]
+
+
 # --- input errors ----------------------------------------------------------------------------
 
 @pytest.mark.parametrize(

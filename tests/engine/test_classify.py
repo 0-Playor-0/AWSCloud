@@ -10,22 +10,29 @@ from engine import dates, names
 CASES = yaml.safe_load(Path(__file__).with_name("cases.yaml").read_text(encoding="utf-8"))
 
 
-def _id(case: list) -> str:
-    return " | ".join(str(c) for c in case)
-
-
-@pytest.mark.parametrize("raw,expected", CASES["normalize"], ids=_id)
+@pytest.mark.parametrize("raw,expected", CASES["normalize"])
 def test_normalize(raw: str, expected: list[str]) -> None:
     assert names.normalize(raw) == expected
 
 
-@pytest.mark.parametrize("a,b,kind", CASES["names"], ids=_id)
+@pytest.mark.parametrize("a,b,kind", CASES["names"])
 def test_name_kind(a: str, b: str, kind: str) -> None:
     assert names.classify(a, b) == kind
     assert names.classify(b, a) == kind  # symmetric
 
 
-@pytest.mark.parametrize("a,b,kind", CASES["dobs"], ids=_id)
+@pytest.mark.parametrize("a,b,kind", CASES["names_negative"])
+def test_transliteration_does_not_merge_unrelated_names(a: str, b: str, kind: str) -> None:
+    assert kind == "different"
+    assert names.classify(a, b) == names.classify(b, a) == "different"
+
+
+@pytest.mark.parametrize("raw,expected", CASES["transliterate"])
+def test_transliterate(raw: str, expected: str) -> None:
+    assert names.transliterate(raw) == expected
+
+
+@pytest.mark.parametrize("a,b,kind", CASES["dobs"])
 def test_dob_kind(a: str, b: str, kind: str) -> None:
     assert dates.classify(a, b) == kind
     assert dates.classify(b, a) == kind  # symmetric

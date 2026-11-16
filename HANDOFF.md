@@ -99,7 +99,7 @@ Errors: `400 invalid_image`, `413 image_too_large`, `422 id_number_detected` (se
 { "summary": { "status": "all_match|minor_differences|mismatches_found", "counts": {"blocking": 1, "risky": 1, "cosmetic": 2} },
   "findings": [ { "field": "name", "kind": "initials_vs_expanded", "severity": "risky",
                   "docs": ["aadhaar","pan"], "values": {"aadhaar":"K RAVI","pan":"RAVI KUMAR"},
-                  "explanation": "plain English", "rule_ids": ["R-NAME-INITIALS"] } ],
+                  "explanation": "plain English", "rule_ids": [] } ],
   "fix_plan": [ { "step": 1, "doc": "pan", "action": "Correct name to match Aadhaar",
                   "caution": null, "source_url": "..." } ],
   "disclaimer": "Self-check only. Not legal advice. Authorities decide." }

@@ -88,6 +88,35 @@ def _single_spelling_variant(a: list[str], b: list[str]) -> bool:
     return min(len(x), len(y)) >= 3 and levenshtein(x, y) <= 2
 
 
+# Architect-approved equivalences, applied in this order.
+_TRANSLIT = (
+    ("KSH", "X"),
+    ("SH", "S"),
+    ("PH", "F"),
+    ("TH", "T"),
+    ("DH", "D"),
+    ("W", "V"),
+    ("EE", "I"),
+    ("OO", "U"),
+    ("AA", "A"),
+)
+_DOUBLE_CONSONANT = re.compile(r"([B-DF-HJ-NP-TV-Z])\1+")
+
+
+def transliterate(token: str) -> str:
+    """Fold common romanisation variants. Used only to downgrade `different`."""
+    for old, new in _TRANSLIT:
+        token = token.replace(old, new)
+    token = _DOUBLE_CONSONANT.sub(r"\1", token)
+    if len(token) > 1 and token.endswith("Y"):
+        token = token[:-1] + "I"
+    return token
+
+
+def _transliteration_variant(a: list[str], b: list[str]) -> bool:
+    return Counter(map(transliterate, a)) == Counter(map(transliterate, b))
+
+
 def classify(a: str, b: str) -> str:
     """Return the name finding kind for two non-blank raw values. Symmetric in a and b."""
     if _SPACES.sub(" ", a.strip()) == _SPACES.sub(" ", b.strip()):
@@ -103,6 +132,6 @@ def classify(a: str, b: str) -> str:
         return "initials_vs_expanded"
     if fully_matched:
         return "missing_token"
-    if _single_spelling_variant(ta, tb):
+    if _single_spelling_variant(ta, tb) or _transliteration_variant(ta, tb):
         return "spelling_variant"
     return "different"
