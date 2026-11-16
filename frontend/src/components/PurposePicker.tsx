@@ -14,7 +14,7 @@ interface Props {
 export function PurposePicker({ value, onChange, onContinue, onSampleSet }: Props) {
   return (
     <section aria-labelledby="purpose-title" className="flex flex-col gap-4">
-      <h2 id="purpose-title" tabIndex={-1} className="text-xl font-bold focus:outline-none">{t("step.purpose")}</h2>
+      <h3 id="purpose-title" tabIndex={-1} className="display text-3xl focus:outline-none">{t("step.purpose")}</h3>
       <fieldset className="flex flex-col gap-2">
         <legend className="sr-only">{t("step.purpose")}</legend>
         {PURPOSES.map((p) => (

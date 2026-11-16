@@ -9,7 +9,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: { include: ["src/**/*.test.ts"] },
-  server: {
-    proxy: { "/v1": process.env.LOCAL_API ?? "http://127.0.0.1:8787" },
-  },
+  server: { proxy: { "/v1": process.env.LOCAL_API ?? "http://127.0.0.1:8787" } },
+  preview: { proxy: { "/v1": process.env.LOCAL_API ?? "http://127.0.0.1:8787" } },
 });

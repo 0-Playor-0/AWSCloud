@@ -42,7 +42,7 @@ test("photo flow: on-device OCR, numbers stripped, consent, text only sent", asy
   await expect(lines).toContainText("Ravi Kumar", { timeout: 45_000 });
   await expect(lines).not.toContainText("9999");
   await expect(page.getByText(/We removed 1 long number/)).toBeVisible();
-  expect(requests.filter((r) => r.url().includes("/v1/"))).toHaveLength(0); // nothing sent yet
+  expect(requests.filter((r) => r.url().includes("/v1/extract"))).toHaveLength(0); // nothing sent yet
 
   await page.getByRole("button", { name: "Send this text" }).click();
   const dialog = page.getByRole("dialog", { name: "Before you send" });
@@ -167,4 +167,25 @@ test("no horizontal scroll on a phone", async ({ page }) => {
   await page.goto("/");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("landing: numbered sections, live counter, reduced motion shows everything", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  for (const n of ["01", "02", "03", "04", "05"]) {
+    await expect(page.locator(`#s${n}-section`)).toBeAttached();
+  }
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Same person.");
+  await expect(page.getByTestId("count-checks")).toHaveText(/^\d/);
+  await page.getByRole("link", { name: "What it costs" }).click();
+  await expect(page.getByText("A rejected PF claim")).toBeVisible();
+});
+
+test("report is a receipt with character-level differences", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Load Anita's sample set" }).click();
+  await check(page);
+  const receipt = page.getByRole("article", { name: "Check receipt" });
+  await expect(receipt).toContainText("General check");
+  await expect(receipt.locator("mark.diff-mark").first()).toBeVisible();
 });

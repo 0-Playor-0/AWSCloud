@@ -23,7 +23,7 @@ export function DocumentList({ docs, editingId, onEdit, onSave, onRemove }: Prop
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-medium">
-                  {label} <span className="text-xs font-normal text-ink/60">· {t(`docs.source.${d.source}`)}</span>
+                  {label} <span className="text-xs font-normal text-ink/70">· {t(`docs.source.${d.source}`)}</span>
                 </p>
                 <p className="break-all font-mono text-sm">
                   {[d.fields.name, d.fields.dob, d.fields.parent_name, d.fields.gender].filter(Boolean).join(" · ")}

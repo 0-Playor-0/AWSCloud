@@ -76,3 +76,12 @@ export function compare(purpose: Purpose, docs: DocumentEntry[], anchor: Anchor 
   };
   return request<CompareResponse>("/v1/compare", postJson(body), validCompare);
 }
+
+export interface Stats {
+  checks: number;
+  checks_with_mismatch: number;
+}
+
+export function stats(): Promise<ApiResult<Stats>> {
+  return request<Stats>("/v1/stats", { method: "GET" }, (b) => isObj(b) && typeof b.checks === "number");
+}

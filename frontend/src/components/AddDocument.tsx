@@ -128,10 +128,10 @@ export function SampleCard({ persona, doc, onAdd }: { persona: string; doc: { do
       </span>
       <p className="text-sm font-semibold">{persona} · {docLabel(doc.doc_type)}</p>
       <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-sm">
-        {f.name && <><dt className="text-ink/60">{t("fields.name")}</dt><dd>{f.name}</dd></>}
-        {f.dob && <><dt className="text-ink/60">{t("fields.dob")}</dt><dd>{f.dob}</dd></>}
-        {f.parent_name && <><dt className="text-ink/60">{t("report.field.parent_name")}</dt><dd>{f.parent_name}</dd></>}
-        {f.gender && <><dt className="text-ink/60">{t("fields.gender")}</dt><dd>{f.gender}</dd></>}
+        {f.name && <><dt className="text-ink/70">{t("fields.name")}</dt><dd>{f.name}</dd></>}
+        {f.dob && <><dt className="text-ink/70">{t("fields.dob")}</dt><dd>{f.dob}</dd></>}
+        {f.parent_name && <><dt className="text-ink/70">{t("report.field.parent_name")}</dt><dd>{f.parent_name}</dd></>}
+        {f.gender && <><dt className="text-ink/70">{t("fields.gender")}</dt><dd>{f.gender}</dd></>}
       </dl>
       {onAdd && <Button size="sm" variant="outline" className="mt-2" onClick={onAdd}>{t("sample.add")}</Button>}
     </div>

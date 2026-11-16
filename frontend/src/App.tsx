@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
-import { AddDocument } from "@/components/AddDocument";
 import { DocumentList } from "@/components/DocumentList";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { Costs } from "@/components/landing/Costs";
+import { Counter } from "@/components/landing/Counter";
+import { Hero } from "@/components/landing/Hero";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { SectionHead } from "@/components/landing/SectionHead";
+import { Wordmark } from "@/components/landing/Wordmark";
 import { PurposePicker } from "@/components/PurposePicker";
 import { Report } from "@/components/Report";
 import { Button } from "@/components/ui/button";
@@ -10,11 +16,15 @@ import { Progress } from "@/components/ui/progress";
 import { compare } from "@/lib/api";
 import { describeError, type ShownError } from "@/lib/errors";
 import type { Persona } from "@/lib/samples";
-import { REPO_URL, t } from "@/lib/strings";
+import { t } from "@/lib/strings";
 import type { Anchor, CompareResponse, DocumentEntry, Purpose } from "@/lib/types";
 import { newId } from "@/lib/utils";
 
+// The add-document card pulls in the cropper and OCR loader: load it on first use.
+const AddDocument = lazy(() => import("@/components/AddDocument").then((m) => ({ default: m.AddDocument })));
+
 type Stage = "purpose" | "documents" | "report";
+const NAV = ["01", "02", "03", "04", "05"] as const;
 const MIN_DOCS = 2;
 const MAX_DOCS = 6;
 
@@ -31,11 +41,18 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
   const [announce, setAnnounce] = useState("");
-  const mainRef = useRef<HTMLElement>(null);
+  const toolRef = useRef<HTMLDivElement>(null);
+  const firstRender = useRef(true);
 
   // Move focus to the new step's heading so keyboard and screen reader users follow along.
   useEffect(() => {
-    mainRef.current?.querySelector<HTMLElement>("h2")?.focus();
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const h = toolRef.current?.querySelector<HTMLElement>("h3[tabindex]");
+    h?.focus({ preventScroll: true });
+    toolRef.current?.scrollIntoView({ block: "start" });
   }, [stage]);
 
   const runCompare = async (a: Anchor) => {
@@ -75,66 +92,97 @@ export default function App() {
     setEditingId(null);
   };
 
-  return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 px-4 py-6">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-black uppercase tracking-tight">{t("app.title")}</h1>
-          {stage !== "purpose" && <Button size="sm" variant="ghost" onClick={reset}>{t("app.startOver")}</Button>}
-        </div>
-        <p>{t("app.tagline")}</p>
-        <p className="text-sm text-ink/70">{t("app.positioning")}</p>
-      </header>
+  const tool = (
+    <div ref={toolRef} className="flex scroll-mt-16 flex-col gap-4">
+      {stage === "purpose" && (
+        <PurposePicker value={purpose} onChange={setPurpose} onContinue={() => setStage("documents")}
+          onSampleSet={loadSample} />
+      )}
 
-      <main ref={mainRef} className="flex flex-col gap-4">
-        {stage === "purpose" && (
-          <PurposePicker value={purpose} onChange={setPurpose} onContinue={() => setStage("documents")}
-            onSampleSet={loadSample} />
-        )}
-
-        {stage === "documents" && (
-          <section aria-labelledby="docs-title" className="flex flex-col gap-4">
-            <h2 id="docs-title" tabIndex={-1} className="text-xl font-bold focus:outline-none">{t("step.documents")}</h2>
-            <p className="text-sm">{t(`purpose.${purpose}`)} · <button className="min-h-11 underline" onClick={() => setStage("purpose")}>{t("docs.back")}</button></p>
-            <div className="flex flex-col gap-1">
-              <p className="text-sm" id="doc-count">{t("docs.count", { n: docs.length })}</p>
-              <Progress value={(docs.length / MAX_DOCS) * 100} aria-labelledby="doc-count" />
-            </div>
-            <DocumentList docs={docs} editingId={editingId} onEdit={setEditingId}
-              onRemove={(id) => setDocs((p) => p.filter((d) => d.id !== id))}
-              onSave={(id, fields) => {
-                setDocs((p) => p.map((d) => (d.id === id ? { ...d, fields } : d)));
-                setEditingId(null);
-              }} />
-            {adding ? (
+      {stage === "documents" && (
+        <section aria-labelledby="docs-title" className="flex flex-col gap-4">
+          <h3 id="docs-title" tabIndex={-1} className="display text-3xl focus:outline-none">{t("step.documents")}</h3>
+          <p className="text-sm">
+            {t(`purpose.${purpose}`)} ·{" "}
+            <button className="min-h-11 underline" onClick={() => setStage("purpose")}>{t("docs.back")}</button>
+          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm" id="doc-count">{t("docs.count", { n: docs.length })}</p>
+            <Progress value={(docs.length / MAX_DOCS) * 100} aria-labelledby="doc-count" />
+          </div>
+          <DocumentList docs={docs} editingId={editingId} onEdit={setEditingId}
+            onRemove={(id) => setDocs((p) => p.filter((d) => d.id !== id))}
+            onSave={(id, fields) => {
+              setDocs((p) => p.map((d) => (d.id === id ? { ...d, fields } : d)));
+              setEditingId(null);
+            }} />
+          {adding ? (
+            <Suspense fallback={<p role="status">…</p>}>
               <AddDocument photoOff={photoOff} consented={consented} onConsent={() => setConsented(true)}
                 onCapReached={() => setPhotoOff(true)} onAdd={addDoc} onCancel={() => setAdding(false)} />
-            ) : docs.length < MAX_DOCS ? (
-              <Button variant="outline" onClick={() => setAdding(true)}>+ {t("docs.add")}</Button>
-            ) : (
-              <p className="text-sm">{t("docs.max")}</p>
-            )}
-            {error && <ErrorAlert error={error} onRetry={() => runCompare(anchor)} onDismiss={() => setError(null)} />}
-            <Button size="lg" disabled={docs.length < MIN_DOCS || busy || adding} onClick={() => runCompare({})}>
-              {busy ? t("docs.checking") : t("docs.check")}
-            </Button>
-          </section>
-        )}
+            </Suspense>
+          ) : docs.length < MAX_DOCS ? (
+            <Button variant="outline" onClick={() => setAdding(true)}>+ {t("docs.add")}</Button>
+          ) : (
+            <p className="text-sm">{t("docs.max")}</p>
+          )}
+          {error && <ErrorAlert error={error} onRetry={() => runCompare(anchor)} onDismiss={() => setError(null)} />}
+          <Button size="lg" disabled={docs.length < MIN_DOCS || busy || adding} onClick={() => runCompare({})}>
+            {busy ? t("docs.checking") : t("docs.check")}
+          </Button>
+        </section>
+      )}
 
-        {stage === "report" && report && (
-          <>
-            {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
-            <Report report={report} docs={docs} anchor={anchor} busy={busy} onAnchor={runCompare}
-              onEdit={() => setStage("documents")} />
-          </>
-        )}
-      </main>
-
-      <div aria-live="polite" className="sr-only">{announce}</div>
-
-      <footer className="mt-auto border-t border-ink/15 pt-4 text-sm text-ink/70">
-        <a className="underline" href={REPO_URL} target="_blank" rel="noreferrer">{t("footer.repo")}</a>
-      </footer>
+      {stage === "report" && report && (
+        <>
+          {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
+          <Report purpose={purpose} report={report} docs={docs} anchor={anchor} busy={busy} onAnchor={runCompare}
+            onEdit={() => setStage("documents")} />
+        </>
+      )}
     </div>
+  );
+
+  return (
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">
+        <a href="#s04-section"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:bg-white focus:p-3">
+          {t("hero.cta")}
+        </a>
+        <nav aria-label={t("nav.label")} className="sticky top-0 z-30 border-b border-ink/15 bg-paper/95 backdrop-blur">
+          <ul className="mx-auto flex max-w-2xl justify-between px-2 font-mono text-sm">
+            {NAV.map((n) => (
+              <li key={n}>
+                <a href={`#s${n}-section`} className="flex min-h-11 items-center px-2 font-semibold hover:text-stamp">
+                  <span aria-hidden="true">{n} //</span>
+                  <span className="sr-only">{t(`nav.${n}`)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="mx-auto max-w-2xl px-4 pb-10">
+          <main className="flex flex-col gap-20">
+            <Hero />
+            <Costs />
+            <HowItWorks />
+            <section aria-labelledby="s04" id="s04-section" className="scroll-mt-16">
+              <SectionHead id="s04" kicker={t("try.kicker")} />
+              <h2 id="s04" className="sr-only">{t("try.kicker")}</h2>
+              <div className="flex items-start justify-between gap-2">
+                <p className="mb-4 text-sm text-ink/80">{t("app.positioning")}</p>
+                {stage !== "purpose" && <Button size="sm" variant="ghost" onClick={reset}>{t("app.startOver")}</Button>}
+              </div>
+              {tool}
+            </section>
+            <Counter />
+          </main>
+          <div aria-live="polite" className="sr-only">{announce}</div>
+          <Wordmark />
+        </div>
+      </MotionConfig>
+    </LazyMotion>
   );
 }

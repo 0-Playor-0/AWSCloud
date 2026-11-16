@@ -173,7 +173,7 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
                 <label className="flex min-h-11 items-center gap-3 rounded border border-ink/15 bg-white px-3">
                   <input type="checkbox" className="size-5 shrink-0" checked={text.keep[i]}
                     onChange={(e) => setText({ ...text, keep: text.keep.map((k, j) => (j === i ? e.target.checked : k)) })} />
-                  <span className={`break-all font-mono text-sm ${text.keep[i] ? "" : "text-ink/40 line-through"}`}>{line}</span>
+                  <span className={`break-all font-mono text-sm ${text.keep[i] ? "" : "text-ink/70 line-through"}`}>{line}</span>
                 </label>
               </li>
             ))}
