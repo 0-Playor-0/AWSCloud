@@ -24,7 +24,7 @@ dev = [
 include = ["engine*", "backend*"]
 
 [tool.setuptools.package-data]
-engine = ["rules.yaml"]
+engine = ["rules.yaml", "guidance.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

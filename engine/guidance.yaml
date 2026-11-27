@@ -1,0 +1,360 @@
+version: 1
+disclaimer: >-
+  General advice only. It does not verify identity or determine eligibility. Official links contain
+  the issuer's requirements; the issuing authority decides whether and how a correction is allowed.
+
+sources:
+  uidai_updates:
+    label: "UIDAI: Enrolment & Update"
+    url: https://uidai.gov.in/en/enrolment-and-update
+    authority: "Unique Identification Authority of India (UIDAI)"
+    status: verified
+    verified_on: "2026-11-27"
+  pan_correction:
+    label: "UTIITSL: Changes or correction in PAN data"
+    url: https://www.pan.utiitsl.com/PAN/csf.html
+    authority: "UTIITSL (authorised PAN service provider)"
+    status: verified
+    verified_on: "2026-11-27"
+  passport_change:
+    label: "Passport Seva: Change in existing personal particulars"
+    url: https://www.passportindia.gov.in/psp/FaqServicesAvailable
+    authority: "Ministry of External Affairs, Passport Seva"
+    status: verified
+    verified_on: "2026-11-27"
+  cbse_correction:
+    label: "CBSE: Duplicate documents and correction in particulars"
+    url: https://www.cbse.gov.in/cbsenew/exam_corr.html
+    authority: "Central Board of Secondary Education (CBSE)"
+    status: verified
+    verified_on: "2026-11-27"
+  rbi_kyc:
+    label: "RBI: FAQs on Master Direction on KYC"
+    url: https://www.rbi.org.in/commonperson/English/Scripts/FAQs.aspx?Id=3782
+    authority: "Reserve Bank of India (RBI)"
+    status: verified
+    verified_on: "2026-11-27"
+  pan_aadhaar_linking:
+    label: "Income Tax Department: Link Aadhaar FAQs"
+    url: https://www.incometax.gov.in/iec/foportal/help/e-filing-link-aadhaar-faq
+    authority: "Income Tax Department, Ministry of Finance"
+    status: verified
+    verified_on: "2026-11-27"
+  epfo_member_faq:
+    label: "EPFO: Member FAQ"
+    url: https://www.epfo.gov.in/faq-epfo/
+    authority: "Employees' Provident Fund Organisation (EPFO)"
+    status: verified
+    verified_on: "2026-11-27"
+
+document_sources:
+  aadhaar: [uidai_updates]
+  pan: [pan_correction]
+  marksheet10: [cbse_correction]
+  passport: [passport_change]
+  passbook: [rbi_kyc]
+  other: []
+
+purpose_sources:
+  general: []
+  pan_aadhaar_link: [pan_aadhaar_linking]
+  epf_claim: [epfo_member_faq]
+
+purpose_steps:
+  general: []
+  pan_aadhaar_link:
+    - >-
+      For PAN-Aadhaar linking, the Income Tax Department says to correct either PAN or Aadhaar so
+      that the details match, then follow the current official linking instructions.
+  epf_claim:
+    - >-
+      If your EPF or UAN record also differs, use EPFO's current official guidance for correcting
+      that record before submitting the claim.
+
+guidance:
+  - field: name
+    kind: format_only
+    code: NAME_FORMAT_ONLY
+    title: "Formatting difference in name"
+    summary: "The names differ only in case, spacing, punctuation or an honorific."
+    priority: optional
+    why_it_matters: >-
+      Some services compare the text as printed even when it represents the same name.
+    recommended_action: >-
+      Usually no correction is needed. Check the format only if a service rejects the check.
+    steps:
+      - "Compare the original documents to confirm that they use the same words."
+      - "Keep a consistent form for future applications unless an issuer says otherwise."
+      - "If a service rejects the check, ask that service which name format it requires."
+
+  - field: name
+    kind: token_order
+    code: NAME_TOKEN_ORDER
+    title: "Name words are in a different order"
+    summary: "The same name words appear on the documents, but in a different order."
+    priority: review
+    why_it_matters: >-
+      A service may treat the same words in a different order as a different name.
+    recommended_action: >-
+      Check which order the intended service requires before changing either document.
+    steps:
+      - "Check the original documents and confirm that the words are the same."
+      - "Check the name-order rule used by the service you need."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: name
+    kind: initials_vs_expanded
+    code: NAME_INITIALS_VS_EXPANDED
+    title: "Initials and expanded name differ"
+    summary: "One document uses initials where the other spells the name out."
+    priority: review
+    why_it_matters: >-
+      Initials are common in Indian records, but some applications require the expanded name.
+    recommended_action: >-
+      Confirm the expansion from an original document and check whether the intended service requires
+      the full form.
+    steps:
+      - "Confirm the full name from an original supporting document."
+      - "Check whether the intended service requires initials or the expanded name."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: name
+    kind: missing_token
+    code: NAME_MISSING_TOKEN
+    title: "Part of the name is missing"
+    summary: "One document leaves out a name part that the other document includes."
+    priority: review
+    why_it_matters: >-
+      A missing middle or family name may be acceptable, but a strict text comparison can treat it
+      as a difference.
+    recommended_action: >-
+      Confirm whether the omitted name part is required for your use before requesting a correction.
+    steps:
+      - "Compare the name with an original supporting document."
+      - "Check whether the service you need requires the complete name."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: name
+    kind: spelling_variant
+    code: NAME_SPELLING_VARIANT
+    title: "Name spelling differs"
+    summary: "A word in the name is spelled differently on the two documents."
+    priority: review
+    why_it_matters: >-
+      Minor spelling variations can still be treated as different by strict systems.
+    recommended_action: >-
+      Verify the spelling against the original document instead of choosing a spelling by guesswork.
+    steps:
+      - "Check the spelling on the original documents."
+      - "Confirm whether the intended service accepts the variant."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: name
+    kind: different
+    code: NAME_DIFFERENT
+    title: "Names are materially different"
+    summary: "The documents contain substantially different names."
+    priority: review_first
+    why_it_matters: >-
+      Strict systems may treat these as different names. The difference can also reflect a legitimate
+      name change, so one document is not automatically wrong.
+    recommended_action: >-
+      Do not change a record merely to match another document. Confirm the correct name from
+      authoritative records first, then follow the relevant issuer's process if a record is wrong.
+    steps:
+      - "Compare the documents with birth, school, passport or other authoritative records."
+      - "Confirm which record is correct and whether a formal name change applies."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: parent_name
+    kind: format_only
+    code: PARENT_NAME_FORMAT_ONLY
+    title: "Formatting difference in parent or guardian name"
+    summary: >-
+      The parent or guardian names differ only in case, spacing, punctuation or an honorific.
+    priority: optional
+    why_it_matters: >-
+      Some services compare the text as printed even when it represents the same name.
+    recommended_action: >-
+      Usually no correction is needed. Check the format only if a service rejects the check.
+    steps:
+      - "Compare the original documents to confirm that they use the same words."
+      - "Keep a consistent form for future applications unless an issuer says otherwise."
+      - "If a service rejects the check, ask that service which format it requires."
+
+  - field: parent_name
+    kind: token_order
+    code: PARENT_NAME_TOKEN_ORDER
+    title: "Parent or guardian name words are in a different order"
+    summary: "The same name words appear on the documents, but in a different order."
+    priority: review
+    why_it_matters: >-
+      A service may treat the same words in a different order as a different name.
+    recommended_action: >-
+      Check which order the intended service requires before changing either document.
+    steps:
+      - "Check the original documents and confirm that the words are the same."
+      - "Check the name-order rule used by the service you need."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: parent_name
+    kind: initials_vs_expanded
+    code: PARENT_NAME_INITIALS_VS_EXPANDED
+    title: "Parent or guardian initials and expanded name differ"
+    summary: "One document uses initials where the other spells the name out."
+    priority: review
+    why_it_matters: >-
+      Initials are common in Indian records, but some applications require the expanded name.
+    recommended_action: >-
+      Confirm the expansion from an original document and check whether the intended service requires
+      the full form.
+    steps:
+      - "Confirm the full name from an original supporting document."
+      - "Check whether the intended service requires initials or the expanded name."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: parent_name
+    kind: missing_token
+    code: PARENT_NAME_MISSING_TOKEN
+    title: "Part of the parent or guardian name is missing"
+    summary: "One document leaves out a name part that the other document includes."
+    priority: review
+    why_it_matters: >-
+      A missing name part may be acceptable, but a strict text comparison can treat it as a
+      difference.
+    recommended_action: >-
+      Confirm whether the omitted name part is required for your use before requesting a correction.
+    steps:
+      - "Compare the name with an original supporting document."
+      - "Check whether the service you need requires the complete name."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: parent_name
+    kind: spelling_variant
+    code: PARENT_NAME_SPELLING_VARIANT
+    title: "Parent or guardian name spelling differs"
+    summary: "A word in the parent or guardian name is spelled differently."
+    priority: review
+    why_it_matters: >-
+      Minor spelling variations can still be treated as different by strict systems.
+    recommended_action: >-
+      Verify the spelling against the original document instead of choosing a spelling by guesswork.
+    steps:
+      - "Check the spelling on the original documents."
+      - "Confirm whether the intended service accepts the variant."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: parent_name
+    kind: different
+    code: PARENT_NAME_DIFFERENT
+    title: "Parent or guardian names are materially different"
+    summary: "The documents contain substantially different parent or guardian names."
+    priority: review_first
+    why_it_matters: >-
+      Strict systems may treat these as different names. The difference can also reflect a legitimate
+      record change, so one document is not automatically wrong.
+    recommended_action: >-
+      Do not change a record merely to match another document. Confirm the correct relationship name
+      from authoritative records first, then follow the relevant issuer's process if a record is
+      wrong.
+    steps:
+      - "Compare the documents with birth, school, passport or other authoritative records."
+      - "Confirm which record is correct and whether a formal relationship change applies."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: dob
+    kind: year_only
+    code: DOB_YEAR_ONLY
+    title: "One date of birth shows only the year"
+    summary: "One document records only the birth year; the other records a full date."
+    priority: review
+    why_it_matters: >-
+      A year-only record may be valid, but a service that compares full dates may still see a
+      difference.
+    recommended_action: >-
+      Confirm the full date from an authoritative record before changing anything.
+    steps:
+      - "Find the full date on an original birth, school, passport or other authoritative document."
+      - "Check whether the year-only record is valid as issued."
+      - "Only request a change if the source confirms that the record is wrong."
+
+  - field: dob
+    kind: day_month_swapped
+    code: DOB_DAY_MONTH_SWAPPED
+    title: "Day and month may be transposed"
+    summary: "The day and month of the date of birth are swapped between the documents."
+    priority: review_first
+    why_it_matters: >-
+      A swapped day and month can create a materially different date for automated checks.
+    recommended_action: >-
+      Verify both the day and month in the original document before deciding which record to change.
+    steps:
+      - "Check the date components on the original documents."
+      - "Compare the date with an authoritative birth record."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: dob
+    kind: off_by_small
+    code: DOB_OFF_BY_SMALL
+    title: "One date-of-birth component differs"
+    summary: "Only the day, month or year of the date of birth differs between the documents."
+    priority: review_first
+    why_it_matters: >-
+      A one-component difference may be a transcription error, but it can still be compared as a
+      different date.
+    recommended_action: >-
+      Confirm the complete date from an authoritative record before requesting a correction.
+    steps:
+      - "Check the complete date on the original documents."
+      - "Compare it with an authoritative birth record."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: dob
+    kind: different
+    code: DOB_DIFFERENT
+    title: "Dates of birth are materially different"
+    summary: "More than one component of the date of birth differs between the documents."
+    priority: review_first
+    why_it_matters: >-
+      The records may represent different dates, and some services compare the full date literally.
+    recommended_action: >-
+      Do not assume either record is wrong. Confirm the correct date from authoritative records first,
+      then follow the relevant issuer's process if a record is wrong.
+    steps:
+      - "Compare the documents with birth, school, passport or other authoritative records."
+      - "Confirm the complete date and whether a formal record correction applies."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+  - field: gender
+    kind: gender_mismatch
+    code: GENDER_MISMATCH
+    title: "Gender values differ"
+    summary: "The documents record different gender values."
+    priority: review_first
+    why_it_matters: >-
+      Some applications use gender as a matching field, while others do not. This check does not
+      verify identity.
+    recommended_action: >-
+      Confirm which record is wrong from an original source before asking an issuer to change it. Do
+      not change a gender record simply to make two documents match.
+    steps:
+      - "Check the original documents and any supporting record."
+      - "See whether the service that prompted the check uses gender."
+      - "If an issuer's record is wrong, use that issuer's current correction process."
+
+fallback:
+  field: unknown
+  kind: unknown
+  code: GENERIC_MISMATCH
+  title: "Review this difference"
+  summary: "This difference type is not recognised, so use generic next steps."
+  priority: review
+  why_it_matters: >-
+    A strict service may compare document text literally, even when the difference looks minor.
+  recommended_action: >-
+    Confirm which record is correct from original documents before asking the issuing authority to
+    correct it.
+  steps:
+    - "Compare the two original documents carefully."
+    - "Check the issuing authority's current correction process."
+    - "Request a correction only after confirming that the record is wrong."

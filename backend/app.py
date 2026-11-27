@@ -18,12 +18,13 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from pydantic import ValidationError
 
 import engine
+from engine.guidance import build_guidance, default_guidance
 
 from . import errors, guard
 from .counters import CounterStore, DynamoCounters
 from .errors import ApiError
 from .extractors import Extractor, ExtractorError, ExtractorThrottled, get_extractor
-from .models import CompareRequest, ExtractRequest
+from .models import CompareDocument, CompareRequest, ExtractRequest, GuidanceResponse
 from .parsers import FIELD_NAMES, Fields
 
 MAX_EXTRACT_BODY = 32_000  # 40 lines x 120 chars, with room for JSON escapes
@@ -106,6 +107,18 @@ def _validate[M](model: type[M], data: dict[str, Any]) -> M:
         raise errors.invalid_request(f"Invalid or missing: {', '.join(where)}.") from None
 
 
+def _document_type_ids(documents: list[CompareDocument]) -> dict[str, str]:
+    """Mirror the engine's stable ids so guidance references can be verified exactly."""
+    seen: dict[str, int] = {}
+    result: dict[str, str] = {}
+    for document in documents:
+        doc_type = document.doc_type
+        seen[doc_type] = seen.get(doc_type, 0) + 1
+        doc_id = doc_type if seen[doc_type] == 1 else f"{doc_type}_{seen[doc_type]}"
+        result[doc_id] = doc_type
+    return result
+
+
 def _fields_response(fields: Fields, low_confidence: frozenset[str]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     warnings: list[str] = []
@@ -157,6 +170,19 @@ def compare() -> dict[str, Any]:
         )
     except engine.EngineInputError:
         raise errors.invalid_request("The documents could not be compared.") from None
+    try:
+        validated_guidance = GuidanceResponse.model_validate({"guidance": report["guidance"]})
+        expected_guidance = build_guidance(
+            report["findings"],
+            req.purpose,
+            _document_type_ids(req.documents),
+            default_guidance(),
+        )
+        if report["guidance"] != expected_guidance:
+            raise ValueError("guidance does not match its findings and source catalogue")
+        report["guidance"] = validated_guidance.model_dump(mode="json")["guidance"]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        raise errors.internal_error() from None
     try:
         deps.counters.record_check(report["summary"]["status"] == "mismatches_found")
     except Exception:

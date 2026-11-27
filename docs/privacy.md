@@ -2,11 +2,12 @@
 
 Plain statement (matches the code; HANDOFF.md section 4):
 
-- **Your photo never leaves your phone.** The crop and the text reading (OCR) happen in your
-  browser. The image is never uploaded.
-- **What is sent:** only the text lines read from your crop (after long numbers such as an
-  Aadhaar number are removed on your phone, and minus any lines you untick), optionally a
-  confidence score per line, and the details you type or confirm for the comparison.
+- **Your photo never leaves your phone.** The text reading (OCR) happens in your browser. The image
+  is never uploaded.
+- **What is sent:** only the text lines read from your photo (after long numbers such as an
+  Aadhaar number are removed on your phone, and minus any lines you untick) after explicit
+  consent, optionally a confidence score per line, and the details you type or confirm for the
+  comparison.
 - **Where:** it is processed on AWS in Sydney, Australia (region `ap-southeast-2`). We make no
   claim that data stays in India.
 - **Not stored:** text and details exist only in memory for the length of one request. Nothing is

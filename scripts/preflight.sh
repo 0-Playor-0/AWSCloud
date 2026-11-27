@@ -45,6 +45,10 @@ section "Budget (alerts at \$10, \$25, \$50 actual)"
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 if aws budgets describe-budget --account-id "$ACCOUNT" --budget-name namma-check-monthly >/dev/null 2>&1; then
   echo "budget namma-check-monthly already exists"
+  echo "notifications (type threshold comparison threshold-type):"
+  aws budgets describe-budget --account-id "$ACCOUNT" --budget-name namma-check-monthly \
+    --query 'Budget.NotificationsWithSubscribers[].Notifications[].[NotificationType,Threshold,ComparisonOperator,ThresholdType]' \
+    --output text
 elif [[ -z "$EMAIL" ]]; then
   echo "skipped: pass your alert email as the first argument to create it"
 else
