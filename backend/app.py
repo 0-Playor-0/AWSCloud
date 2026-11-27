@@ -23,7 +23,7 @@ from . import errors, guard
 from .counters import CounterStore, DynamoCounters
 from .errors import ApiError
 from .extractors import Extractor, ExtractorError, ExtractorThrottled, get_extractor
-from .models import CompareRequest, ExtractRequest
+from .models import CompareRequest, ExtractRequest, GuidanceResponse
 from .parsers import FIELD_NAMES, Fields
 
 MAX_EXTRACT_BODY = 32_000  # 40 lines x 120 chars, with room for JSON escapes
@@ -157,6 +157,13 @@ def compare() -> dict[str, Any]:
         )
     except engine.EngineInputError:
         raise errors.invalid_request("The documents could not be compared.") from None
+    try:
+        validated_guidance = GuidanceResponse.model_validate({"guidance": report["guidance"]})
+        if len(validated_guidance.guidance) != len(report["findings"]):
+            raise ValueError("guidance does not match findings")
+        report["guidance"] = validated_guidance.model_dump(mode="json")["guidance"]
+    except (KeyError, TypeError, ValueError):
+        raise errors.internal_error() from None
     try:
         deps.counters.record_check(report["summary"]["status"] == "mismatches_found")
     except Exception:

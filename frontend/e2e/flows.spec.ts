@@ -9,7 +9,7 @@ test("sample flow: load a sample set and get a report", async ({ page }) => {
   await check(page);
   await expect(page.getByTestId("report-status")).toHaveText("Mismatches found");
   await expect(page.getByRole("heading", { name: "Fix plan" })).toBeVisible();
-  await expect(page.getByText(/Self-check only. Not legal advice./)).toBeVisible();
+  await expect(page.getByRole("article", { name: "Check receipt" }).getByText(/Self-check only. Not legal advice./)).toBeVisible();
 });
 
 test("typed flow with an anchor updates the fix plan", async ({ page }) => {
@@ -19,7 +19,7 @@ test("typed flow with an anchor updates the fix plan", async ({ page }) => {
   await check(page);
   await expect(page.getByTestId("report-status")).toHaveText("Mismatches found");
   await expect(page.locator("[data-severity=risky]")).toHaveCount(1);
-  await expect(page.getByText(/Decide which document shows your correct name/)).toBeVisible();
+  await expect(page.getByRole("list", { name: "Fix plan" }).getByText(/Decide which document shows your correct name/)).toBeVisible();
   await page.getByLabel("Correct name is on").selectOption({ label: "Aadhaar" });
   await page.getByRole("button", { name: "Update fix plan" }).click();
   await expect(page.getByText(/Decide which document/)).toHaveCount(0);
@@ -217,6 +217,67 @@ test("report is a receipt with character-level differences", async ({ page }) =>
   const receipt = page.getByRole("article", { name: "Check receipt" });
   await expect(receipt).toContainText("General check");
   await expect(receipt.locator("mark.diff-mark").first()).toBeVisible();
+});
+
+test("report shows matched and differing fields, then a resolution roadmap", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Load Anita's sample set" }).click();
+  await check(page);
+  await expect(page.getByRole("heading", { name: "Field-by-field check" })).toBeVisible();
+  await expect(page.locator("[data-state=difference]").first()).toBeVisible();
+  await expect(page.locator("[data-state=matched]").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resolution roadmap" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Guidance for each difference" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fix plan" })).toBeVisible();
+  await expect(page.getByText(/Use the guidance below/)).toBeVisible();
+});
+
+test("print report is useful without personal document values", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Load Anita's sample set" }).click();
+  await check(page);
+  await expect(page.getByRole("button", { name: "Save or print PDF" })).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  const printReport = page.locator(".print-report");
+  await expect(printReport).toBeVisible();
+  await expect(printReport).toContainText("Aadhaar");
+  await expect(printReport).toContainText("This is a self-check, not official verification");
+  await expect(printReport).not.toContainText("ANITA SHARMA");
+  await expect(printReport).not.toContainText("1990-04-07");
+});
+
+test("language selector switches the interface without losing the stage", async ({ page }) => {
+  await page.goto("/");
+  const selector = page.getByRole("combobox");
+  await selector.selectOption("hi");
+  await expect(page.getByRole("heading", { name: "1. आप किसके लिए आवेदन कर रहे हैं?" })).toBeVisible();
+  await selector.selectOption("mr");
+  await expect(page.getByRole("heading", { name: "1. तुम कशासाठी अर्ज करत आहात?" })).toBeVisible();
+});
+
+test("report has no horizontal overflow on a phone", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Load Kavya's sample set" }).click();
+  await check(page);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("report remains usable on phone, tablet and desktop widths", async ({ page }) => {
+  for (const viewport of [
+    { width: 360, height: 740 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Load Kavya's sample set" }).click();
+    await check(page);
+    await expect(page.getByRole("heading", { name: "Field-by-field check" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save or print PDF" })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `viewport ${viewport.width}px`).toBeLessThanOrEqual(0);
+  }
 });
 
 for (const [name, status, body] of [

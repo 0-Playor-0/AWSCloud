@@ -11,7 +11,7 @@ import { describeError, type ShownError } from "@/lib/errors";
 import { cropImage, type CroppedImage } from "@/lib/image";
 import { downloadOcr, OCR_DOWNLOAD_MB, ocrAssetsCached, readLines, type OcrLine } from "@/lib/ocr";
 import { sanitizeLines } from "@/lib/sanitize";
-import { t } from "@/lib/strings";
+import { useLanguage, useT } from "@/lib/language-context";
 import type { DocType, ExtractResponse } from "@/lib/types";
 
 interface Props {
@@ -43,6 +43,8 @@ const ASPECTS = [
 ];
 
 export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapReached, onUseTyped }: Props) {
+  const t = useT();
+  const { locale } = useLanguage();
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -104,7 +106,7 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
       const raw = await readLines(img.blob, (p) => setProgress({ phase: "read", percent: Math.round(p * 100) }));
       const clean = sanitizeLines(raw);
       if (clean.lines.length === 0) {
-        setError(describeError({ code: "unreadable", message: "", hint: "" }));
+        setError(describeError({ code: "unreadable", message: "", hint: "" }, locale));
         setCropped(null);
       } else {
         setText({ ...clean, keep: clean.lines.map(() => true) });
@@ -128,7 +130,7 @@ export function PhotoInput({ docType, consented, onConsent, onExtracted, onCapRe
     if (res.ok) return onExtracted(res.data);
     if (res.error.code === "daily_cap_reached") return onCapReached();
     if (res.error.code === "id_number_detected") recrop();
-    setError(describeError(res.error));
+    setError(describeError(res.error, locale));
   };
 
   return (

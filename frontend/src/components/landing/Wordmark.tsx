@@ -1,7 +1,8 @@
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import { WORDMARK } from "@/lib/wordmark";
 
 export function Wordmark() {
+  const t = useT();
   const shown = WORDMARK.filter((w) => w.enabled);
   const unverified = shown.some((w) => !w.verified);
   return (

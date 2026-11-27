@@ -11,10 +11,12 @@ AWS in Sydney and not stored.
 | Logic | One Lambda (Python 3.14, Powertools, pydantic) | Pay per request; parsers, ID guard and comparison engine in one function |
 | Counters | DynamoDB on-demand table `nc_counters` | Anonymous aggregate counts only; daily cap for a future metered extractor |
 | Logs | CloudWatch Logs (14-day retention) | Metadata only: request id, route, doc_type, status, latency, extractor, error code |
+| Operations | CloudWatch dashboard | API traffic/errors/latency, Lambda invocations/errors/duration/throttles/concurrency and DynamoDB consumption |
 | Photo reading | **None on AWS**: Tesseract.js in the browser | The image never leaves the phone |
 | Site hosting | S3 (private, encrypted, public access blocked) | Stores the static build only; reachable only through CloudFront (Origin Access Control) |
 | CDN + HTTPS | CloudFront (PriceClass_200, includes India edges) | Free HTTPS URL, edge caching near users, security headers (CSP, HSTS, frame-deny) |
-| Alerts | CloudWatch alarms + SNS email | Lambda errors, Lambda throttles, API 5xx rate, counter-store failures; metadata only |
+| Alerts | CloudWatch alarms + SNS email | Lambda errors, throttles and excessive duration; API 5xx rate; counter-store failures |
+| Least privilege | Explicit Lambda execution role | Writes only to this function's log group and reads/writes only the counter table |
 | Cost guard | AWS Budgets | Email alerts at $10, $25, $50 actual spend |
 
 ## Cost controls
@@ -27,6 +29,9 @@ AWS in Sydney and not stored.
 - CloudFront caches hashed assets and the versioned OCR files for a year, so repeat visits cost
   almost nothing; `index.html` is revalidated.
 - Logs kept 14 days.
+- The operations dashboard uses only standard AWS service metrics: no custom metric ingestion.
+- The Lambda role is explicit and resource-scoped; it has no access to S3, Bedrock, Textract,
+  KMS, Secrets Manager or other service APIs.
 
 ## Why Textract was removed (2026-11-16)
 

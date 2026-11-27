@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import type { DocFields, FieldName, Gender } from "@/lib/types";
 
 const MAX_NAME = 100;
@@ -44,7 +44,7 @@ function validDate(s: string): boolean {
   return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
 }
 
-function validate(d: Draft): { fields?: DocFields; error?: string } {
+function validate(d: Draft, t: (key: string) => string): { fields?: DocFields; error?: string } {
   const name = d.name.trim() || null;
   const parent = d.parent_name.trim() || null;
   if ((name?.length ?? 0) > MAX_NAME || (parent?.length ?? 0) > MAX_NAME) return { error: t("fields.tooLong") };
@@ -62,6 +62,7 @@ function validate(d: Draft): { fields?: DocFields; error?: string } {
 }
 
 export function FieldForm({ initial, title, submitLabel, lowConfidence = [], onSubmit, onCancel }: Props) {
+  const t = useT();
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial));
   const [error, setError] = useState<string | null>(null);
   const id = useId();
@@ -70,7 +71,7 @@ export function FieldForm({ initial, title, submitLabel, lowConfidence = [], onS
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const r = validate(draft);
+    const r = validate(draft, t);
     if (r.error) return setError(r.error);
     setError(null);
     onSubmit(r.fields!);

@@ -80,6 +80,147 @@ body {
   mix-blend-mode: multiply;
 }
 
+/* Privacy-safe print report. The browser's print dialog can save this as a PDF. */
+.print-report {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: #111 !important;
+    font-size: 10pt;
+  }
+
+  body {
+    background-image: none !important;
+  }
+
+  body > #root {
+    display: none !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-report,
+  .print-report * {
+    visibility: visible !important;
+  }
+
+  .print-report {
+    display: block !important;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    color: #111;
+    font-family: var(--font-sans);
+  }
+
+  .print-report header {
+    margin-bottom: 6mm;
+    border-bottom: 2px solid #111;
+    padding-bottom: 4mm;
+  }
+
+  .print-report h1 {
+    margin: 1mm 0 4mm;
+    font-family: var(--font-display);
+    font-size: 22pt;
+    line-height: 1.1;
+  }
+
+  .print-report h2 {
+    margin: 0 0 2mm;
+    font-size: 12pt;
+  }
+
+  .print-report section {
+    margin-top: 5mm;
+    break-inside: auto;
+  }
+
+  .print-report footer {
+    margin-top: 5mm;
+    break-inside: avoid;
+  }
+
+  .print-report h2 {
+    break-after: avoid;
+  }
+
+  .print-report p,
+  .print-report li {
+    line-height: 1.45;
+  }
+
+  .print-report ul,
+  .print-report ol {
+    margin: 2mm 0;
+    padding-left: 6mm;
+  }
+
+  .print-report li {
+    margin-bottom: 1.5mm;
+  }
+
+  .print-report .print-guidance > li {
+    break-inside: auto;
+    margin-bottom: 4mm;
+  }
+
+  .print-report .print-guidance > li > p,
+  .print-report .print-guidance > li > ol,
+  .print-report .print-guidance > li > .print-checklist {
+    break-inside: avoid;
+  }
+
+  .print-report .print-guidance > li > p:first-child {
+    break-after: avoid;
+  }
+
+  .print-report .print-kicker {
+    font-family: var(--font-mono);
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .print-report .print-meta {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 1mm 4mm;
+    margin: 0;
+    font-size: 9pt;
+  }
+
+  .print-report .print-meta div {
+    display: contents;
+  }
+
+  .print-report .print-meta dt {
+    font-weight: 700;
+  }
+
+  .print-report .print-meta dd {
+    margin: 0;
+  }
+
+  .print-report footer {
+    border-top: 1px solid #555;
+    padding-top: 3mm;
+    font-size: 9pt;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

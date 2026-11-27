@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { docLabel } from "@/lib/labels";
 import { PERSONAS } from "@/lib/samples";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import { DOC_TYPES, FIELD_NAMES, type DocFields, type DocType, type DocumentEntry, type ExtractResponse, type FieldName } from "@/lib/types";
 
 type Mode = "photo" | "typed" | "sample";
@@ -40,6 +40,7 @@ function fromExtract(res: ExtractResponse): { fields: DocFields; low: FieldName[
 }
 
 export function AddDocument({ photoOff, consented, onConsent, onCapReached, onAdd, onCancel }: Props) {
+  const t = useT();
   const [docType, setDocType] = useState<DocType>("aadhaar");
   const [mode, setMode] = useState<Mode>(photoOff ? "typed" : "photo");
   const [extracted, setExtracted] = useState<{ fields: DocFields; low: FieldName[] } | null>(null);
@@ -63,7 +64,7 @@ export function AddDocument({ photoOff, consented, onConsent, onCapReached, onAd
           <select className="min-h-11 rounded-md border border-ink/30 bg-white px-3" value={docType}
             disabled={extracted !== null}
             onChange={(e) => setDocType(e.target.value as DocType)}>
-            {DOC_TYPES.map((d) => <option key={d} value={d}>{docLabel(d)}</option>)}
+            {DOC_TYPES.map((d) => <option key={d} value={d}>{docLabel(d, t)}</option>)}
           </select>
         </label>
 
@@ -108,6 +109,7 @@ export function AddDocument({ photoOff, consented, onConsent, onCapReached, onAd
 }
 
 function SamplePicker({ onAdd }: { onAdd: (doc: { doc_type: DocType; fields: DocFields }) => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink/80">{t("sample.notice")}</p>
@@ -121,13 +123,14 @@ function SamplePicker({ onAdd }: { onAdd: (doc: { doc_type: DocType; fields: Doc
 }
 
 export function SampleCard({ persona, doc, onAdd }: { persona: string; doc: { doc_type: DocType; fields: DocFields }; onAdd?: () => void }) {
+  const t = useT();
   const f = doc.fields;
   return (
     <div className="relative rounded-md border-2 border-dashed border-ink/30 bg-paper p-3">
       <span className="absolute right-2 top-2 rotate-6 rounded border-2 border-stamp px-1 text-xs font-bold tracking-widest text-stamp">
         {t("sample.badge")}
       </span>
-      <p className="text-sm font-semibold">{persona} · {docLabel(doc.doc_type)}</p>
+      <p className="text-sm font-semibold">{persona} · {docLabel(doc.doc_type, t)}</p>
       <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-sm">
         {f.name && <><dt className="text-ink/70">{t("fields.name")}</dt><dd>{f.name}</dd></>}
         {f.dob && <><dt className="text-ink/70">{t("fields.dob")}</dt><dd>{f.dob}</dd></>}

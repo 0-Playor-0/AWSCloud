@@ -57,6 +57,30 @@ export interface FixStep {
   source_url: string | null;
 }
 
+export type GuidancePriority = "optional" | "review" | "review_first";
+
+export interface OfficialReference {
+  source_id: string;
+  label: string;
+  url: string;
+  authority: string;
+  status: "verified" | "needs_verification";
+  verified_on: string | null;
+}
+
+export interface GuidanceItem {
+  finding_index: number;
+  code: string;
+  title: string;
+  summary: string;
+  priority: GuidancePriority;
+  why_it_matters: string;
+  recommended_action: string;
+  steps: string[];
+  official_references: OfficialReference[];
+  disclaimer: string;
+}
+
 export interface CompareResponse {
   summary: {
     status: "all_match" | "minor_differences" | "mismatches_found";
@@ -64,6 +88,7 @@ export interface CompareResponse {
   };
   findings: Finding[];
   fix_plan: FixStep[];
+  guidance: GuidanceItem[];
   disclaimer: string;
 }
 

@@ -1,7 +1,7 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { ShownError } from "@/lib/errors";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 
 interface Props {
   error: ShownError;
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export function ErrorAlert({ error, onRetry, onDismiss }: Props) {
+  const t = useT();
   return (
     <Alert variant="destructive" role="alert" data-error-code={error.code}>
       <AlertTitle>{error.message}</AlertTitle>

@@ -2,7 +2,7 @@ import { DiffText } from "@/components/DiffText";
 import { Stamp } from "@/components/Stamp";
 import { Button } from "@/components/ui/button";
 import { docLabel } from "@/lib/labels";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import type { DocType } from "@/lib/types";
 
 // One fictional person, five spellings (fields only; no layouts, numbers or emblems).
@@ -15,6 +15,7 @@ const SLIPS: { doc: DocType; name: string }[] = [
 ];
 
 export function Hero() {
+  const t = useT();
   const base = SLIPS[0].name;
   return (
     <section aria-labelledby="s01" id="s01-section" className="scroll-mt-16 pt-6">
@@ -34,7 +35,7 @@ export function Hero() {
               className="relative rounded-sm border border-ink/15 bg-white px-4 py-3 shadow-[0_2px_0_rgb(20_33_61/0.08)]"
               style={{ transform: `rotate(${[-1.2, 0.8, -0.4, 1.1, -0.7][i]}deg)`, marginTop: i ? -6 : 0 }}
             >
-              <span className="block font-mono text-[0.7rem] uppercase tracking-widest text-ink/70">{docLabel(s.doc)}</span>
+              <span className="block font-mono text-[0.7rem] uppercase tracking-widest text-ink/70">{docLabel(s.doc, t)}</span>
               <span className="block font-mono text-lg font-semibold sm:text-xl"><DiffText base={base} value={s.name} /></span>
             </li>
           ))}

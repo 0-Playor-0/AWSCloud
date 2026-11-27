@@ -82,7 +82,8 @@ function postJson(body: unknown): RequestInit {
 const isObj = (b: unknown): b is Record<string, unknown> => typeof b === "object" && b !== null;
 const validExtract = (b: unknown) => isObj(b) && isObj(b.fields) && Array.isArray(b.warnings);
 const validCompare = (b: unknown) =>
-  isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan);
+  isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan)
+  && Array.isArray(b.guidance);
 
 /** POST /v1/extract with on-device OCR text only; one retry on 502, 503 or throttled. */
 export async function extract(docType: DocType, lines: OcrLine[]): Promise<ApiResult<ExtractResponse>> {

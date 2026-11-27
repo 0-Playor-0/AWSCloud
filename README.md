@@ -23,8 +23,9 @@ Phone (crop + OCR) ──text──▶ API Gateway HTTP API ─▶ Lambda (Pytho
       └── static site: CloudFront ─▶ private S3
 ```
 
-Services and why: [docs/build-summary.md](docs/build-summary.md). Sourced facts:
-[docs/facts.md](docs/facts.md). Full spec: [HANDOFF.md](HANDOFF.md).
+Services and why: [docs/build-summary.md](docs/build-summary.md). AWS operations and deployment:
+[docs/aws-infrastructure.md](docs/aws-infrastructure.md). Sourced facts: [docs/facts.md](docs/facts.md).
+Full spec: [HANDOFF.md](HANDOFF.md).
 
 ## Repo layout
 
@@ -79,7 +80,7 @@ Needs an AWS account, the AWS CLI and SAM CLI, and credentials for an IAM user (
    ```bash
    scripts/preflight.sh you@example.com
    ```
-3. Deploy the API, site bucket, CloudFront and alarms (the email receives alarm notifications;
+3. Deploy the API, site bucket, CloudFront, dashboard and alarms (the email receives alarm notifications;
    confirm the subscription email from AWS SNS):
    ```bash
    sam build && sam deploy --parameter-overrides GitSha=$(git rev-parse --short HEAD) AlarmEmail=you@example.com

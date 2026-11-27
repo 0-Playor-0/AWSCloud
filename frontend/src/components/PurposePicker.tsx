@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERSONAS, type Persona } from "@/lib/samples";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import { PURPOSES, type Purpose } from "@/lib/types";
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
 }
 
 export function PurposePicker({ value, onChange, onContinue, onSampleSet }: Props) {
+  const t = useT();
   return (
     <section aria-labelledby="purpose-title" className="flex flex-col gap-4">
       <h3 id="purpose-title" tabIndex={-1} className="display text-3xl focus:outline-none">{t("step.purpose")}</h3>
@@ -38,7 +39,7 @@ export function PurposePicker({ value, onChange, onContinue, onSampleSet }: Prop
         <CardContent>
           {PERSONAS.map((p) => (
             <div key={p.id} className="flex flex-col gap-1 border-t border-ink/10 pt-3 first:border-0 first:pt-0">
-              <p className="text-sm text-ink/80">{p.story}</p>
+              <p className="text-sm text-ink/80">{t(p.storyKey)}</p>
               <Button variant="outline" onClick={() => onSampleSet(p)}>
                 {t("sample.addSet", { persona: p.name })}
               </Button>

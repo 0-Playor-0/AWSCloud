@@ -1,7 +1,7 @@
 import { FieldForm } from "@/components/FieldForm";
 import { Button } from "@/components/ui/button";
 import { docLabel } from "@/lib/labels";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 import type { DocFields, DocumentEntry } from "@/lib/types";
 
 interface Props {
@@ -13,11 +13,12 @@ interface Props {
 }
 
 export function DocumentList({ docs, editingId, onEdit, onSave, onRemove }: Props) {
+  const t = useT();
   if (docs.length === 0) return <p className="text-sm text-ink/70">{t("docs.empty")}</p>;
   return (
     <ul className="flex flex-col gap-2" aria-label={t("step.documents")}>
       {docs.map((d) => {
-        const label = docLabel(d.doc_type);
+        const label = docLabel(d.doc_type, t);
         return (
           <li key={d.id} className="rounded-md border border-ink/20 bg-white p-3">
             <div className="flex items-start justify-between gap-2">

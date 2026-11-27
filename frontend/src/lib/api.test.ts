@@ -81,7 +81,7 @@ describe("requests", () => {
     expect(JSON.parse(fn.mock.calls[0][1].body)).toEqual({ doc_type: "pan", ocr_lines: ["RAVI KUMAR", "14/03/2007"], ...extra });
   });
 
-  const ok200: [number, unknown] = [200, { summary: {}, findings: [], fix_plan: [] }];
+  const ok200: [number, unknown] = [200, { summary: {}, findings: [], fix_plan: [], guidance: [] }];
   const docs = [{ id: "a", doc_type: "pan" as const, source: "typed" as const, fields: { name: "A", dob: null, parent_name: null, gender: null } }];
 
   it.each([
@@ -145,7 +145,10 @@ describe("requests", () => {
   });
 
   it("sends anchor only when one is set", async () => {
-    const fn = respond([200, { summary: {}, findings: [], fix_plan: [] }], [200, { summary: {}, findings: [], fix_plan: [] }]);
+    const fn = respond(
+      [200, { summary: {}, findings: [], fix_plan: [], guidance: [] }],
+      [200, { summary: {}, findings: [], fix_plan: [], guidance: [] }],
+    );
     const docs = [{ id: "a", doc_type: "pan" as const, source: "typed" as const, fields: { name: "A", dob: null, parent_name: null, gender: null } }];
     await compare("general", docs, {});
     await compare("general", docs, { name: "pan" });

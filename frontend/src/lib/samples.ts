@@ -1,4 +1,5 @@
 // Fictional personas (HANDOFF.md 4.9). Field sets only: no numbers, layouts, emblems or QR codes.
+import type { StringKey } from "./strings";
 import type { DocFields, DocType } from "./types";
 
 export interface SampleDoc {
@@ -9,7 +10,7 @@ export interface SampleDoc {
 export interface Persona {
   id: string;
   name: string;
-  story: string;
+  storyKey: StringKey;
   docs: SampleDoc[];
 }
 
@@ -17,7 +18,7 @@ export const PERSONAS: Persona[] = [
   {
     id: "kavya",
     name: "Kavya",
-    story: "Initials on one card, full name on another; one document has only a birth year.",
+    storyKey: "sample.story.kavya",
     docs: [
       { doc_type: "aadhaar", fields: { name: "R KAVYA", dob: "2006", parent_name: null, gender: "F" } },
       { doc_type: "pan", fields: { name: "KAVYA RAMESH", dob: "2006-08-21", parent_name: "RAMESH S", gender: null } },
@@ -27,7 +28,7 @@ export const PERSONAS: Persona[] = [
   {
     id: "anita",
     name: "Anita",
-    story: "Surname changed after marriage; day and month swapped on the passbook.",
+    storyKey: "sample.story.anita",
     docs: [
       { doc_type: "aadhaar", fields: { name: "ANITA SHARMA", dob: "1990-04-07", parent_name: null, gender: "F" } },
       { doc_type: "passbook", fields: { name: "ANITA KUMARI SINGH", dob: "1990-07-04", parent_name: null, gender: null } },
@@ -37,7 +38,7 @@ export const PERSONAS: Persona[] = [
   {
     id: "arjun",
     name: "Arjun",
-    story: "Everything lines up apart from punctuation.",
+    storyKey: "sample.story.arjun",
     docs: [
       { doc_type: "pan", fields: { name: "ARJUN MEHTA", dob: "1998-11-02", parent_name: "VIKRAM MEHTA", gender: null } },
       { doc_type: "passport", fields: { name: "Arjun  Mehta", dob: "1998-11-02", parent_name: null, gender: "M" } },

@@ -17,7 +17,7 @@ export default defineConfig({
   timeout: 60_000, // the first on-device OCR loads ~7 MB of engine + model
   reporter: "list",
   // localhost (not 127.0.0.1) is the dev origin the API's CORS allows
-  use: { ...devices["Pixel 7"], baseURL: remote ?? (api ? "http://localhost:5173" : "http://127.0.0.1:5173"), trace: "off" },
+  use: { ...devices["Pixel 7"], baseURL: remote ?? "http://localhost:5173", trace: "off" },
   webServer: remote
     ? undefined
     : api

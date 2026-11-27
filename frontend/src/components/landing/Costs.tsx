@@ -1,5 +1,6 @@
 import { Reveal } from "@/components/Reveal";
-import { t, type StringKey } from "@/lib/strings";
+import { type StringKey } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 
 import { SectionHead } from "./SectionHead";
 
@@ -17,6 +18,7 @@ const ITEMS: { title: StringKey; body: StringKey; url: string | null; reported: 
 ];
 
 export function Costs() {
+  const t = useT();
   return (
     <section aria-labelledby="s02" id="s02-section" className="scroll-mt-16">
       <SectionHead id="s02" kicker={t("costs.kicker")} title={t("costs.title")} />

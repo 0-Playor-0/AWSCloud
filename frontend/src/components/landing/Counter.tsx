@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { stats, type Stats } from "@/lib/api";
-import { REPO_URL, t } from "@/lib/strings";
+import { REPO_URL } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 
 import { SectionHead } from "./SectionHead";
 
 export function Counter() {
+  const t = useT();
   const [data, setData] = useState<Stats | null | "error">(null);
   useEffect(() => {
     let live = true;

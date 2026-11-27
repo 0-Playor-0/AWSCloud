@@ -2,6 +2,7 @@ import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import { DocumentList } from "@/components/DocumentList";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { Costs } from "@/components/landing/Costs";
 import { Counter } from "@/components/landing/Counter";
@@ -15,8 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { compare } from "@/lib/api";
 import { describeError, type ShownError } from "@/lib/errors";
+import { useLanguage, useT } from "@/lib/language-context";
 import type { Persona } from "@/lib/samples";
-import { t } from "@/lib/strings";
 import type { Anchor, CompareResponse, DocumentEntry, Purpose } from "@/lib/types";
 import { newId } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ const MIN_DOCS = 2;
 const MAX_DOCS = 6;
 
 export default function App() {
+  const t = useT();
+  const { locale } = useLanguage();
   const [stage, setStage] = useState<Stage>("purpose");
   const [purpose, setPurpose] = useState<Purpose>("general");
   const [docs, setDocs] = useState<DocumentEntry[]>([]);
@@ -37,6 +40,7 @@ export default function App() {
   const [consented, setConsented] = useState(false); // memory only (HANDOFF.md 4.7)
   const [photoOff, setPhotoOff] = useState(false); // set after 429 daily_cap_reached
   const [report, setReport] = useState<CompareResponse | null>(null);
+  const [reportGeneratedAt, setReportGeneratedAt] = useState<Date | null>(null);
   const [anchor, setAnchor] = useState<Anchor>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ShownError | null>(null);
@@ -63,10 +67,11 @@ export default function App() {
     setBusy(false);
     if (!res.ok) {
       setAnnounce("");
-      return setError(describeError(res.error));
+      return setError(describeError(res.error, locale));
     }
     setAnchor(a);
     setReport(res.data);
+    setReportGeneratedAt(new Date());
     setStage("report");
     setAnnounce(t(`report.status.${res.data.summary.status}`));
   };
@@ -86,6 +91,7 @@ export default function App() {
     setStage("purpose");
     setDocs([]);
     setReport(null);
+    setReportGeneratedAt(null);
     setAnchor({});
     setError(null);
     setAdding(false);
@@ -133,11 +139,11 @@ export default function App() {
         </section>
       )}
 
-      {stage === "report" && report && (
+      {stage === "report" && report && reportGeneratedAt && (
         <>
           {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
           <Report purpose={purpose} report={report} docs={docs} anchor={anchor} busy={busy} onAnchor={runCompare}
-            onEdit={() => setStage("documents")} />
+            generatedAt={reportGeneratedAt} onEdit={() => setStage("documents")} />
         </>
       )}
     </div>
@@ -151,16 +157,19 @@ export default function App() {
           {t("hero.cta")}
         </a>
         <nav aria-label={t("nav.label")} className="sticky top-0 z-30 border-b border-ink/15 bg-paper/95 backdrop-blur">
-          <ul className="mx-auto flex max-w-2xl justify-between px-2 font-mono text-sm">
-            {NAV.map((n) => (
-              <li key={n}>
-                <a href={`#s${n}-section`} className="flex min-h-11 items-center px-2 font-semibold hover:text-stamp">
-                  <span aria-hidden="true">{n} //</span>
-                  <span className="sr-only">{t(`nav.${n}`)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="mx-auto flex max-w-2xl items-center gap-1 px-2">
+            <ul className="flex min-w-0 flex-1 justify-between font-mono text-xs sm:text-sm">
+              {NAV.map((n) => (
+                <li key={n}>
+                  <a href={`#s${n}-section`} className="flex min-h-11 items-center px-1 font-semibold hover:text-stamp sm:px-2">
+                    <span aria-hidden="true">{n}<span className="hidden min-[360px]:inline"> //</span></span>
+                    <span className="sr-only">{t(`nav.${n}`)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <LanguageSwitcher />
+          </div>
         </nav>
 
         <div className="mx-auto max-w-2xl px-4 pb-10">

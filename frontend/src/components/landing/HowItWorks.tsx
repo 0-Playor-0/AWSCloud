@@ -1,5 +1,5 @@
 import { Reveal } from "@/components/Reveal";
-import { t } from "@/lib/strings";
+import { useT } from "@/lib/language-context";
 
 import { SectionHead } from "./SectionHead";
 
@@ -10,6 +10,7 @@ const STEPS = [
 ] as const;
 
 export function HowItWorks() {
+  const t = useT();
   return (
     <section aria-labelledby="s03" id="s03-section" className="scroll-mt-16">
       <SectionHead id="s03" kicker={t("how.kicker")} title={t("how.title")} />
