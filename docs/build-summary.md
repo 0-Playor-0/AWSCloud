@@ -42,8 +42,8 @@ Phases 0–3 used Amazon Textract `DetectDocumentText` on an uploaded crop. It w
   "the image is discarded" could not be guaranteed.
 - Setting that policy requires an AWS Organization, and creating one ends the account's Free
   plan credits. If credits end, the account closes and the demo URL dies.
-- So photo reading moved to the device: Tesseract.js (English) runs in the browser on the crop,
-  long digit runs are removed, and only text lines are sent to `/v1/extract`, where the same
+- So photo reading moved to the device: Tesseract.js (English) runs in the browser on the chosen
+  photo, long digit runs are removed, and only text lines are sent to `/v1/extract`, where the same
   deterministic parsers and the ID-number guard run (defence in depth).
 
 Consequences: no Textract IAM permission, no image handling on the server, no image error

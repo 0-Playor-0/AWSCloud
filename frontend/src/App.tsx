@@ -1,197 +1,282 @@
-import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-import { DocumentList } from "@/components/DocumentList";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ErrorAlert } from "@/components/ErrorAlert";
-import { Costs } from "@/components/landing/Costs";
-import { Counter } from "@/components/landing/Counter";
-import { Hero } from "@/components/landing/Hero";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { SectionHead } from "@/components/landing/SectionHead";
-import { Wordmark } from "@/components/landing/Wordmark";
-import { PurposePicker } from "@/components/PurposePicker";
-import { Report } from "@/components/Report";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { compare } from "@/lib/api";
-import { describeError, type ShownError } from "@/lib/errors";
-import { useLanguage, useT } from "@/lib/language-context";
-import type { Persona } from "@/lib/samples";
-import type { Anchor, CompareResponse, DocumentEntry, Purpose } from "@/lib/types";
-import { newId } from "@/lib/utils";
-
-// The add-document card pulls in the cropper and OCR loader: load it on first use.
-const AddDocument = lazy(() => import("@/components/AddDocument").then((m) => ({ default: m.AddDocument })));
-
-type Stage = "purpose" | "documents" | "report";
-const NAV = ["01", "02", "03", "04", "05"] as const;
-const MIN_DOCS = 2;
-const MAX_DOCS = 6;
+import { useEffect, useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { TopMasthead } from './components/TopMasthead';
+import { NewspaperBackground } from './components/NewspaperBackground';
+import { HeroSection } from './components/sections/HeroSection';
+import { ProblemSection } from './components/sections/ProblemSection';
+import { HowItWorksSection } from './components/sections/HowItWorksSection';
+import { WorkspaceSection } from './components/sections/WorkspaceSection';
+import { ReportSection } from './components/sections/ReportSection';
+import { AppLanguage, CitizenDocument, ComparisonReport, PurposeId, SectionId } from './types/documents';
+import { compareDocuments, fetchStats } from './lib/api';
+import { ComparisonInputError, prepareComparison, toComparisonReport } from './lib/backendAdapter';
+import type { StatsResponse } from './lib/backendTypes';
+import { buildComparisonReport, DEMO_PRESETS } from './utils/comparisonEngine';
+import { UI_COPY } from './utils/i18n';
 
 export default function App() {
-  const t = useT();
-  const { locale } = useLanguage();
-  const [stage, setStage] = useState<Stage>("purpose");
-  const [purpose, setPurpose] = useState<Purpose>("general");
-  const [docs, setDocs] = useState<DocumentEntry[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [consented, setConsented] = useState(false); // memory only (HANDOFF.md 4.7)
-  const [photoOff, setPhotoOff] = useState(false); // set after 429 daily_cap_reached
-  const [report, setReport] = useState<CompareResponse | null>(null);
-  const [reportGeneratedAt, setReportGeneratedAt] = useState<Date | null>(null);
-  const [anchor, setAnchor] = useState<Anchor>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ShownError | null>(null);
-  const [announce, setAnnounce] = useState("");
-  const toolRef = useRef<HTMLDivElement>(null);
-  const firstRender = useRef(true);
+  const initialPreset = DEMO_PRESETS[0];
 
-  // Move focus to the new step's heading so keyboard and screen reader users follow along.
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    const h = toolRef.current?.querySelector<HTMLElement>("h3[tabindex]");
-    h?.focus({ preventScroll: true });
-    toolRef.current?.scrollIntoView({ block: "start" });
-  }, [stage]);
-
-  const runCompare = async (a: Anchor) => {
-    setBusy(true);
-    setError(null);
-    setAnnounce(t("docs.checking"));
-    const res = await compare(purpose, docs, a);
-    setBusy(false);
-    if (!res.ok) {
-      setAnnounce("");
-      return setError(describeError(res.error, locale));
-    }
-    setAnchor(a);
-    setReport(res.data);
-    setReportGeneratedAt(new Date());
-    setStage("report");
-    setAnnounce(t(`report.status.${res.data.summary.status}`));
-  };
-
-  const addDoc = (d: Omit<DocumentEntry, "id">) => {
-    setDocs((prev) => (prev.length >= MAX_DOCS ? prev : [...prev, { ...d, id: newId() }]));
-    setAdding(false);
-  };
-
-  const loadSample = (p: Persona) => {
-    setDocs(p.docs.map((d) => ({ ...d, id: newId(), source: "sample" })));
-    setAdding(false);
-    setStage("documents");
-  };
-
-  const reset = () => {
-    setStage("purpose");
-    setDocs([]);
-    setReport(null);
-    setReportGeneratedAt(null);
-    setAnchor({});
-    setError(null);
-    setAdding(false);
-    setEditingId(null);
-  };
-
-  const tool = (
-    <div ref={toolRef} className="flex scroll-mt-16 flex-col gap-4">
-      {stage === "purpose" && (
-        <PurposePicker value={purpose} onChange={setPurpose} onContinue={() => setStage("documents")}
-          onSampleSet={loadSample} />
-      )}
-
-      {stage === "documents" && (
-        <section aria-labelledby="docs-title" className="flex flex-col gap-4">
-          <h3 id="docs-title" tabIndex={-1} className="display text-3xl focus:outline-none">{t("step.documents")}</h3>
-          <p className="text-sm">
-            {t(`purpose.${purpose}`)} ·{" "}
-            <button className="min-h-11 underline" onClick={() => setStage("purpose")}>{t("docs.back")}</button>
-          </p>
-          <div className="flex flex-col gap-1">
-            <p className="text-sm" id="doc-count">{t("docs.count", { n: docs.length })}</p>
-            <Progress value={(docs.length / MAX_DOCS) * 100} aria-labelledby="doc-count" />
-          </div>
-          <DocumentList docs={docs} editingId={editingId} onEdit={setEditingId}
-            onRemove={(id) => setDocs((p) => p.filter((d) => d.id !== id))}
-            onSave={(id, fields) => {
-              setDocs((p) => p.map((d) => (d.id === id ? { ...d, fields } : d)));
-              setEditingId(null);
-            }} />
-          {adding ? (
-            <Suspense fallback={<p role="status">…</p>}>
-              <AddDocument photoOff={photoOff} consented={consented} onConsent={() => setConsented(true)}
-                onCapReached={() => setPhotoOff(true)} onAdd={addDoc} onCancel={() => setAdding(false)} />
-            </Suspense>
-          ) : docs.length < MAX_DOCS ? (
-            <Button variant="outline" onClick={() => setAdding(true)}>+ {t("docs.add")}</Button>
-          ) : (
-            <p className="text-sm">{t("docs.max")}</p>
-          )}
-          {error && <ErrorAlert error={error} onRetry={() => runCompare(anchor)} onDismiss={() => setError(null)} />}
-          <Button size="lg" disabled={docs.length < MIN_DOCS || busy || adding} onClick={() => runCompare({})}>
-            {busy ? t("docs.checking") : t("docs.check")}
-          </Button>
-        </section>
-      )}
-
-      {stage === "report" && report && reportGeneratedAt && (
-        <>
-          {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
-          <Report purpose={purpose} report={report} docs={docs} anchor={anchor} busy={busy} onAnchor={runCompare}
-            generatedAt={reportGeneratedAt} onEdit={() => setStage("documents")} />
-        </>
-      )}
-    </div>
+  const [language, setLanguage] = useState<AppLanguage>('en');
+  const [activeSection, setActiveSection] = useState<SectionId>('hero');
+  const [activePresetId, setActivePresetId] = useState<string>(initialPreset.id);
+  const [purpose, setPurpose] = useState<PurposeId>(initialPreset.purpose);
+  const [documents, setDocuments] = useState<CitizenDocument[]>(
+    () => structuredClone(initialPreset.documents)
   );
+  const [checksRun, setChecksRun] = useState<number>(0);
+  const [mismatchesFound, setMismatchesFound] = useState<number>(0);
+  const [backendStats, setBackendStats] = useState<StatsResponse | null>(null);
+  const [backendReport, setBackendReport] = useState<ComparisonReport | null>(null);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
+
+  // Track active section in viewport to dynamically shift emphasis across background cartoons
+  useEffect(() => {
+    const sectionIds: SectionId[] = ['hero', 'problem', 'how-it-works', 'workspace', 'report'];
+    const elements = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => Boolean(el));
+
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+        if (visible.length > 0) {
+          const id = visible[0].target.getAttribute('data-section') as SectionId | null;
+          if (id) setActiveSection(id);
+        }
+      },
+      {
+        rootMargin: '-20% 0px -45% 0px',
+        threshold: [0.05, 0.25, 0.5],
+      }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetchStats().then((result) => {
+      if (active && result.ok) setBackendStats(result.data);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const previewReport = useMemo(
+    () => buildComparisonReport(documents, purpose),
+    [documents, purpose]
+  );
+  const report = backendReport ?? previewReport;
+
+  const handleJumpTo = (id: SectionId) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(id);
+    }
+  };
+
+  const handleSelectPreset = (presetId: string) => {
+    const preset = DEMO_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    documents.forEach((document) => {
+      if (document.uploadedImageUrl) URL.revokeObjectURL(document.uploadedImageUrl);
+    });
+    setActivePresetId(preset.id);
+    setPurpose(preset.purpose);
+    setDocuments(structuredClone(preset.documents));
+    setBackendReport(null);
+    setComparisonError(null);
+  };
+
+  const handleChangePurpose = (nextPurpose: PurposeId) => {
+    setPurpose(nextPurpose);
+    setBackendReport(null);
+    setComparisonError(null);
+  };
+
+  const handleChangeDocuments: Dispatch<SetStateAction<CitizenDocument[]>> = (nextDocs) => {
+    setActivePresetId('custom');
+    setDocuments(nextDocs);
+    setBackendReport(null);
+    setComparisonError(null);
+  };
+
+  const handleRunComparison = async () => {
+    setIsComparing(true);
+    setComparisonError(null);
+    try {
+      const prepared = prepareComparison(purpose, documents);
+      const result = await compareDocuments(prepared);
+      if (!result.ok) {
+        setComparisonError(`${result.error.message} ${result.error.hint}`.trim());
+        return;
+      }
+      setBackendReport(
+        toComparisonReport(result.data, documents, purpose, prepared.redactedNumberCount)
+      );
+      setChecksRun((prev) => prev + 1);
+      if (result.data.summary.status === 'mismatches_found') {
+        setMismatchesFound((prev) => prev + 1);
+      }
+      void fetchStats().then((stats) => {
+        if (stats.ok) setBackendStats(stats.data);
+      });
+      handleJumpTo('report');
+    } catch (error) {
+      setComparisonError(
+        error instanceof ComparisonInputError
+          ? error.message
+          : 'The documents could not be compared. Please check the fields and try again.'
+      );
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  const soFarCopy = UI_COPY[language].soFar;
+  const footerCopy = UI_COPY[language].footer;
 
   return (
-    <LazyMotion features={domAnimation} strict>
-      <MotionConfig reducedMotion="user">
-        <a href="#s04-section"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:bg-white focus:p-3">
-          {t("hero.cta")}
-        </a>
-        <nav aria-label={t("nav.label")} className="sticky top-0 z-30 border-b border-ink/15 bg-paper/95 backdrop-blur">
-          <div className="mx-auto flex max-w-2xl items-center gap-1 px-2">
-            <ul className="flex min-w-0 flex-1 justify-between font-mono text-xs sm:text-sm">
-              {NAV.map((n) => (
-                <li key={n}>
-                  <a href={`#s${n}-section`} className="flex min-h-11 items-center px-1 font-semibold hover:text-stamp sm:px-2">
-                    <span aria-hidden="true">{n}<span className="hidden min-[360px]:inline"> //</span></span>
-                    <span className="sr-only">{t(`nav.${n}`)}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <LanguageSwitcher />
-          </div>
-        </nav>
+    <div className="min-h-screen newsprint-bg text-[#14213d] flex flex-col">
+      <TopMasthead
+        activeSection={activeSection}
+        onJumpTo={handleJumpTo}
+        language={language}
+        onChangeLanguage={setLanguage}
+      />
 
-        <div className="mx-auto max-w-2xl px-4 pb-10">
-          <main className="flex flex-col gap-20">
-            <Hero />
-            <Costs />
-            <HowItWorks />
-            <section aria-labelledby="s04" id="s04-section" className="scroll-mt-16">
-              <SectionHead id="s04" kicker={t("try.kicker")} />
-              <h2 id="s04" className="sr-only">{t("try.kicker")}</h2>
-              <div className="flex items-start justify-between gap-2">
-                <p className="mb-4 text-sm text-ink/80">{t("app.positioning")}</p>
-                {stage !== "purpose" && <Button size="sm" variant="ghost" onClick={reset}>{t("app.startOver")}</Button>}
+      {/* Full-canvas living illustrated newspaper sheet behind the centered Namma Check flow */}
+      <div className="relative flex-1 overflow-x-clip">
+        <NewspaperBackground activeSection={activeSection} />
+
+        {/* Matching subtle black ink mist along the far-left and far-right edges of the page */}
+        <div
+          aria-hidden="true"
+          className="no-print pointer-events-none fixed sm:absolute inset-y-0 left-0 z-20 w-10 sm:w-12"
+          style={{
+            background:
+              'linear-gradient(to right, rgba(14, 16, 20, 0.16) 0%, rgba(14, 16, 20, 0.06) 45%, rgba(14, 16, 20, 0) 100%)',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="no-print pointer-events-none fixed sm:absolute inset-y-0 right-0 z-20 w-10 sm:w-12"
+          style={{
+            background:
+              'linear-gradient(to left, rgba(14, 16, 20, 0.16) 0%, rgba(14, 16, 20, 0.06) 45%, rgba(14, 16, 20, 0) 100%)',
+          }}
+        />
+
+        {/* Preserved narrow centred Namma Check experience on a light ivory sheet with subtle black edge mist */}
+        <main className="relative z-10 mx-auto w-full max-w-[1040px] px-4 sm:px-8 bg-[#fcfaf5]/98 sm:bg-[#fcfaf5]/98 sm:shadow-[0_0_22px_4px_rgba(14,16,20,0.14)] border-x-[1.5px] border-[#0e1014]/65">
+          {/* Subtle black ink mist flanking the central column without obscuring cartoons */}
+          <div
+            aria-hidden="true"
+            className="no-print pointer-events-none hidden sm:block absolute inset-y-0 -left-12 w-12"
+            style={{
+              background:
+                'linear-gradient(to left, rgba(14, 16, 20, 0.16) 0%, rgba(14, 16, 20, 0.06) 45%, rgba(14, 16, 20, 0) 100%)',
+            }}
+          >
+            <div className="absolute inset-y-0 right-1.5 w-px bg-[#0e1014]/25" />
+          </div>
+          <div
+            aria-hidden="true"
+            className="no-print pointer-events-none hidden sm:block absolute inset-y-0 -right-12 w-12"
+            style={{
+              background:
+                'linear-gradient(to right, rgba(14, 16, 20, 0.16) 0%, rgba(14, 16, 20, 0.06) 45%, rgba(14, 16, 20, 0) 100%)',
+            }}
+          >
+            <div className="absolute inset-y-0 left-1.5 w-px bg-[#0e1014]/25" />
+          </div>
+
+          <HeroSection language={language} onJumpTo={handleJumpTo} />
+          <ProblemSection language={language} />
+          <HowItWorksSection language={language} />
+          <WorkspaceSection
+            language={language}
+            purpose={purpose}
+            onChangePurpose={handleChangePurpose}
+            documents={documents}
+            onChangeDocuments={handleChangeDocuments}
+            activePresetId={activePresetId}
+            onSelectPreset={handleSelectPreset}
+            onCompareAndViewReport={handleRunComparison}
+            isComparing={isComparing}
+            comparisonError={comparisonError}
+            onJumpTo={handleJumpTo}
+          />
+          <ReportSection
+            language={language}
+            report={report}
+            onJumpTo={handleJumpTo}
+          />
+
+          {/* Compact 05 // So far backend stats strip */}
+          <section className="no-print py-8">
+            <p className="font-mono text-[11px] tracking-[0.1em] text-[#c8322b] uppercase font-semibold">
+              {soFarCopy.kicker}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-6">
+              <div>
+                <div className="font-sans text-3xl font-extrabold text-[#14213d] tabular-nums">
+                  {Math.max(backendStats?.checks ?? 0, checksRun)}
+                </div>
+                <div className="font-mono text-xs text-[#14213d]/75">
+                  {soFarCopy.checksRun}
+                </div>
               </div>
-              {tool}
-            </section>
-            <Counter />
-          </main>
-          <div aria-live="polite" className="sr-only">{announce}</div>
-          <Wordmark />
+              <div>
+                <div className="font-sans text-3xl font-extrabold text-[#c8322b] tabular-nums">
+                  {Math.max(backendStats?.checks_with_mismatch ?? 0, mismatchesFound)}
+                </div>
+                <div className="font-mono text-xs text-[#14213d]/75">
+                  {soFarCopy.mismatchesFound}
+                </div>
+              </div>
+            </div>
+            <p className="mt-4 font-mono text-xs text-[#14213d]/75 underline decoration-[#14213d]/40">
+              {soFarCopy.publicCode}
+            </p>
+          </section>
+        </main>
+      </div>
+
+      {/* Quiet Editorial Colophon Footer with Indic script transliterations */}
+      <footer className="no-print relative z-10 border-t border-[#14213d]/15 bg-[#f6f1e7] py-6">
+        <div className="mx-auto max-w-[1040px] px-4 sm:px-8 space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[#14213d]">
+            <span className="font-masthead font-extrabold tracking-[0.08em] text-base uppercase">
+              NAMMA CHECK
+            </span>
+            <span className="text-xs text-[#14213d]/70">
+              ನಮ್ಮ ಚೆಕ್ · நம்ம செக் · నమ్మ చెక్ · നമ്മ ചെക്ക് · नम्मा चेक · নম্মা চেক
+            </span>
+          </div>
+          <p className="text-[11px] text-[#14213d]/60">
+            {footerCopy.scriptNote}
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-[11px] text-[#14213d]/65 font-mono">
+            <span>{footerCopy.note}</span>
+          </div>
         </div>
-      </MotionConfig>
-    </LazyMotion>
+      </footer>
+    </div>
   );
 }

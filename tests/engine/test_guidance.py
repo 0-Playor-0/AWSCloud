@@ -188,13 +188,21 @@ def _write_catalogue(tmp_path: Path, data: dict[str, Any]) -> Path:
     "mutate,error",
     [
         (lambda data: data["sources"]["uidai_updates"].update(status="maybe"), "status"),
+        (lambda data: data["sources"].pop("uidai_updates"), "every approved source"),
         (lambda data: data["sources"]["uidai_updates"].update(url="http://example.test"), "HTTPS"),
+        (
+            lambda data: data["sources"]["uidai_updates"].update(
+                url="https://example.test/official"
+            ),
+            "approved official host",
+        ),
         (
             lambda data: data["document_sources"].update(aadhaar=["missing_source"]),
             "unknown source",
         ),
         (lambda data: data["guidance"].pop(), "pairs mismatch"),
         (lambda data: data["guidance"][0].update(code=data["guidance"][1]["code"]), "duplicate"),
+        (lambda data: data["guidance"][0].update(steps=[]), "must not be empty"),
         (lambda data: data["fallback"].update(priority="review_first"), "urgency"),
     ],
 )
@@ -202,6 +210,26 @@ def test_invalid_catalogue_is_rejected(tmp_path: Path, mutate, error: str) -> No
     data = _catalogue_data()
     mutate(data)
     with pytest.raises(ValueError, match=error):
+        load_guidance(_write_catalogue(tmp_path, data))
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Your identity has been verified.",
+        "Your identity has been successfully verified.",
+        "You are eligible to make the correction.",
+        "You are legally eligible to apply.",
+        "You qualify for the correction.",
+        "The correction will be granted.",
+        "The correction is guaranteed.",
+        "The correction is assured.",
+    ],
+)
+def test_unsupported_claims_are_rejected(tmp_path: Path, claim: str) -> None:
+    data = _catalogue_data()
+    data["guidance"][0]["recommended_action"] = claim
+    with pytest.raises(ValueError, match="unsupported claim"):
         load_guidance(_write_catalogue(tmp_path, data))
 
 

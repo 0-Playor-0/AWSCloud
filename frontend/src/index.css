@@ -1,224 +1,133 @@
-@import "tailwindcss";
-@import "@fontsource-variable/bricolage-grotesque/wght.css";
+@import "@fontsource/anton/latin-400.css";
 @import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
 @import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-sans/latin-700.css";
+@import "@fontsource/ibm-plex-sans/latin-400-italic.css";
 @import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
 @import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/playfair-display/latin-700.css";
+@import "@fontsource/playfair-display/latin-800.css";
+@import "tailwindcss";
 
-/* "The document desk": paper, ink and rubber stamps (HANDOFF.md section 7).
-   Contrast (computed, WCAG 2): on paper ink 14.2, stamp 4.7, match 4.7, amber-dark 5.3;
-   on white stamp 5.3, match 5.3; ink on amber 7.4; stamp-dark on the diff highlight 6.0.
-   Amber #e9a23b is only a background under ink text. */
 @theme {
+  --font-display: "Anton", ui-sans-serif, system-ui, sans-serif;
+  --font-anton: "Anton", ui-sans-serif, system-ui, sans-serif;
+  --font-masthead: "Playfair Display", Georgia, ui-serif, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
   --color-paper: #f6f1e7;
-  --color-paper-dark: #ece4d3;
-  --color-ink: #14213d;
-  --color-stamp: #c8322b;
-  --color-stamp-dark: #a3241e;
-  --color-match: #1f7a4d;
-  --color-amber: #e9a23b;
-  --color-amber-dark: #8a5a00;
-  --font-display: "Bricolage Grotesque Variable", "Arial Narrow", sans-serif;
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --color-paper-light: #fbf8f2;
+  --color-paper-dark: #ebe3d3;
+  --color-navy: #14213d;
+  --color-ink-muted: #4a5568;
+  --color-stamp-red: #c8322b;
+  --color-stamp-green: #1f7a4d;
+  --color-stamp-amber: #e9a23b;
 }
 
-html {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  line-height: 1.55;
-  /* faint paper grain */
-  background-image: radial-gradient(rgb(20 33 61 / 0.035) 1px, transparent 1px);
-  background-size: 6px 6px;
-}
-
-:focus-visible {
-  outline: 3px solid var(--color-ink);
-  outline-offset: 3px;
-}
-
-.display {
-  font-family: var(--font-display);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.02em;
-  line-height: 0.92;
-}
-
-/* Tear-off receipt edges (report). */
-.receipt {
-  --tooth: 10px;
-  background: #fffdf8;
-  mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 90deg, #0000 91deg) bottom / var(--tooth) 51% repeat-x,
-    conic-gradient(from 135deg at top, #0000, #000 1deg 90deg, #0000 91deg) top / var(--tooth) 51% repeat-x;
-  padding-block: calc(var(--tooth) + 1rem);
-}
-
-.diff-mark {
-  background: rgb(200 50 43 / 0.14);
-  color: var(--color-stamp-dark);
-  text-decoration: underline 2px;
-  text-underline-offset: 3px;
-}
-
-.stamp {
-  font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  border: 4px double currentColor;
-  border-radius: 6px;
-  padding: 0.1em 0.45em;
-  text-transform: uppercase;
-  mix-blend-mode: multiply;
-}
-
-/* Privacy-safe print report. The browser's print dialog can save this as a PDF. */
-.print-report {
-  display: none;
-}
-
-@media print {
-  @page {
-    size: A4;
-    margin: 14mm;
-  }
-
-  html,
-  body {
-    background: white !important;
-    color: #111 !important;
-    font-size: 10pt;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background-color: #f6f1e7;
+    color: #14213d;
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
   body {
-    background-image: none !important;
+    background-color: #f6f1e7;
+    color: #14213d;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
-  body > #root {
-    display: none !important;
+  h1, h2, .font-display, .font-anton {
+    font-family: "Anton", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.015em;
   }
+}
 
-  body * {
-    visibility: hidden !important;
-  }
+/* Deep, full-strength editorial ink on transparent PNG cartoons */
+.cartoon-blend {
+  filter: contrast(1.65) brightness(0.46) saturate(1.1);
+  transition: filter 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 
-  .print-report,
-  .print-report * {
-    visibility: visible !important;
-  }
+.cartoon-blend-hovered {
+  filter: contrast(1.85) brightness(0.36) saturate(1.14);
+}
 
-  .print-report {
-    display: block !important;
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-    color: #111;
-    font-family: var(--font-sans);
-  }
+/* Keep the illustration strips close to the widened content sheet instead of the viewport edges. */
+.editorial-strip-left {
+  left: max(0px, calc(50% - 760px));
+}
 
-  .print-report header {
-    margin-bottom: 6mm;
-    border-bottom: 2px solid #111;
-    padding-bottom: 4mm;
-  }
+.editorial-strip-right {
+  right: max(0px, calc(50% - 760px));
+}
 
-  .print-report h1 {
-    margin: 1mm 0 4mm;
-    font-family: var(--font-display);
-    font-size: 22pt;
-    line-height: 1.1;
-  }
+/* Subtle newsprint grain overlay */
+.newsprint-bg {
+  background-color: #f6f1e7;
+  background-image:
+    radial-gradient(rgba(20, 33, 61, 0.045) 0.75px, transparent 0.75px),
+    radial-gradient(rgba(20, 33, 61, 0.025) 0.5px, #f6f1e7 0.5px);
+  background-size: 24px 24px, 11px 11px;
+  background-position: 0 0, 6px 6px;
+}
 
-  .print-report h2 {
-    margin: 0 0 2mm;
-    font-size: 12pt;
-  }
+/* Faint halftone texture for editorial margin zones */
+.halftone-margin {
+  background-image: radial-gradient(rgba(20, 33, 61, 0.09) 1px, transparent 1px);
+  background-size: 9px 9px;
+}
 
-  .print-report section {
-    margin-top: 5mm;
-    break-inside: auto;
-  }
+/* Subtle ruled notebook / official form lines */
+.ruled-paper {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    rgba(20, 33, 61, 0.06) 27px,
+    rgba(20, 33, 61, 0.06) 28px
+  );
+}
 
-  .print-report footer {
-    margin-top: 5mm;
-    break-inside: avoid;
-  }
+/* Receipt serrated edge top & bottom */
+.receipt-edge-top {
+  background-image: linear-gradient(135deg, #fbf8f2 50%, transparent 50%),
+    linear-gradient(225deg, #fbf8f2 50%, transparent 50%);
+  background-position: top left;
+  background-size: 12px 12px;
+  background-repeat: repeat-x;
+}
 
-  .print-report h2 {
-    break-after: avoid;
-  }
+.receipt-edge-bottom {
+  background-image: linear-gradient(315deg, #fbf8f2 50%, transparent 50%),
+    linear-gradient(45deg, #fbf8f2 50%, transparent 50%);
+  background-position: bottom left;
+  background-size: 12px 12px;
+  background-repeat: repeat-x;
+}
 
-  .print-report p,
-  .print-report li {
-    line-height: 1.45;
-  }
+/* Editorial rubber stamp treatment */
+.rubber-stamp {
+  border: 2px solid currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+  letter-spacing: 0.08em;
+}
 
-  .print-report ul,
-  .print-report ol {
-    margin: 2mm 0;
-    padding-left: 6mm;
-  }
-
-  .print-report li {
-    margin-bottom: 1.5mm;
-  }
-
-  .print-report .print-guidance > li {
-    break-inside: auto;
-    margin-bottom: 4mm;
-  }
-
-  .print-report .print-guidance > li > p,
-  .print-report .print-guidance > li > ol,
-  .print-report .print-guidance > li > .print-checklist {
-    break-inside: avoid;
-  }
-
-  .print-report .print-guidance > li > p:first-child {
-    break-after: avoid;
-  }
-
-  .print-report .print-kicker {
-    font-family: var(--font-mono);
-    font-size: 8pt;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .print-report .print-meta {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 1mm 4mm;
-    margin: 0;
-    font-size: 9pt;
-  }
-
-  .print-report .print-meta div {
-    display: contents;
-  }
-
-  .print-report .print-meta dt {
-    font-weight: 700;
-  }
-
-  .print-report .print-meta dd {
-    margin: 0;
-  }
-
-  .print-report footer {
-    border-top: 1px solid #555;
-    padding-top: 3mm;
-    font-size: 9pt;
-  }
+/* Custom subtle paper crease line */
+.paper-fold {
+  background: linear-gradient(
+    to bottom,
+    rgba(20, 33, 61, 0.05) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(20, 33, 61, 0.04) 100%
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -226,7 +135,17 @@ body {
     scroll-behavior: auto;
   }
   *, *::before, *::after {
-    transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
   }
 }

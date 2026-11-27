@@ -89,10 +89,11 @@ produce findings. `official_references` can be empty when no relevant document s
 | `official_references` | array of reference objects | Relevant issuer or authority sources with verification metadata. |
 | `disclaimer` | string | Limits on the advice. |
 
-The API validates the guidance response schema before returning it. Missing guidance, invalid
-priorities, non-HTTPS reference URLs, and a guidance/findings count mismatch fail closed with the
-normal `500 internal_error` response. No validation exception or source data is returned to the
-client.
+The API validates the guidance response schema before returning it and recomputes the
+expected guidance from the findings, purpose, document types, and source catalogue. Missing
+guidance, a code attached to the wrong finding, altered source metadata, invalid priorities,
+non-HTTPS reference URLs, and a guidance/findings count mismatch fail closed with the normal
+`500 internal_error` response. No validation exception or source data is returned to the client.
 
 ## Discrepancy coverage
 
@@ -104,8 +105,10 @@ The catalogue covers every non-exact discrepancy kind produced by the comparison
 - Gender: `gender_mismatch`.
 
 Codes are field-specific, for example `NAME_INITIALS_VS_EXPANDED`,
-`PARENT_NAME_INITIALS_VS_EXPANDED`, and `DOB_OFF_BY_SMALL`. An unknown or future field/kind
-combination uses the safe `GENERIC_MISMATCH` fallback instead of failing or inventing advice.
+`PARENT_NAME_INITIALS_VS_EXPANDED`, and `DOB_OFF_BY_SMALL`. An unknown runtime field/kind
+combination passed to the guidance builder uses the safe `GENERIC_MISMATCH` fallback instead of
+inventing advice. Adding a new discrepancy kind to the comparison engine intentionally requires
+an atomic catalogue update; the loader fails closed if known-pair coverage is missing.
 
 `review_first` means “verify the underlying record before changing anything.” It does not claim
 that a correction is legally possible, that identity has been verified, or that a correction will
@@ -118,7 +121,8 @@ are selected from the document types involved in the finding. Purpose-specific r
 steps are then added:
 
 - `pan_aadhaar_link` adds the Income Tax Department linking FAQ.
-- `epf_claim` adds the EPFO member FAQ and its employer-correction step.
+- `epf_claim` adds the EPFO member FAQ and a reminder to follow EPFO's current official guidance
+  for a differing EPF or UAN record.
 
 The registry currently contains these sources, verified on **2026-11-27**:
 
@@ -138,7 +142,9 @@ fetch as a successful verification.
 
 A source that cannot be verified must use `status: needs_verification` and
 `verified_on: null`. The loader rejects unknown source IDs, duplicate codes, missing known-pair
-coverage, non-HTTPS URLs, invalid dates, and unsupported priority values.
+coverage, empty step lists, non-HTTPS URLs, hosts outside the approved official domains, invalid
+dates, unsupported priority values, and common affirmative forms of identity, eligibility, or
+guarantee claims. Static copy still requires human source and safety review when it is edited.
 
 ## Privacy and safety
 
@@ -149,8 +155,8 @@ coverage, non-HTTPS URLs, invalid dates, and unsupported priority values.
 - The guidance disclaimer repeats that this is general advice, not identity verification or an
   eligibility decision. Authorities decide whether and how to correct a record.
 - The backend guidance schema is strict: unknown fields inside guidance or references, invalid
-  priorities, non-HTTPS references, and malformed guidance are rejected rather than passed
-  through.
+  priorities, non-HTTPS references, mismatched codes or source metadata, and malformed guidance
+  are rejected rather than passed through.
 
 ## Bedrock decision
 

@@ -111,6 +111,19 @@ def test_compare_contract_and_stats(fakes, call) -> None:
     assert call("GET", "/v1/stats") == (200, {"checks": 1, "checks_with_mismatch": 1})
 
 
+def test_compare_validates_guidance_for_duplicate_document_types(fakes, call) -> None:
+    body = {
+        "purpose": "general",
+        "documents": [
+            {"doc_type": "other", "fields": {"name": "ARJUN MEHRA"}},
+            {"doc_type": "other", "fields": {"name": "ARJUN K MEHRA"}},
+        ],
+    }
+    status, response = call("POST", "/v1/compare", body)
+    assert status == 200
+    assert len(response["guidance"]) == 1
+
+
 def test_compare_all_match_returns_empty_guidance(fakes, call) -> None:
     body = {
         "purpose": "general",
@@ -129,8 +142,13 @@ def test_compare_all_match_returns_empty_guidance(fakes, call) -> None:
     "mutate",
     [
         lambda guidance: guidance[0].update(priority="critical"),
+        lambda guidance: guidance[0].update(code="DOB_OFF_BY_SMALL"),
         lambda guidance: guidance[0]["official_references"][0].update(url="http://example.test"),
         lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-99-99"),
+        lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-11-26"),
+        lambda guidance: guidance[0]["official_references"][0].update(
+            status="needs_verification"
+        ),
         lambda guidance: guidance[0].update(unexpected="value"),
     ],
 )

@@ -26,7 +26,7 @@ Read this whole file before doing anything. Save it in the repo root as `HANDOFF
 
 - **Problem:** Indian names and dates of birth are recorded differently across Aadhaar, PAN, marksheets, passports and bank records (initials, name order, spellings, surname changes). Strict systems reject on small differences. People discover this only after a rejection.
 - **Users:** students applying for exams, scholarships and passports; workers claiming provident fund; anyone linking PAN and Aadhaar; people whose surname changed after marriage; people from regions that use initials (e.g. "K. Ravi" vs "Ravi Kumar").
-- **Core flow:** choose purpose → add 2–5 documents (crop a photo, or type the fields, or use sample documents) → confirm the extracted fields → get a mismatch report and a fix plan.
+- **Core flow:** choose purpose → add 2–6 documents (choose a photo, or type the fields, or use sample documents) → confirm the extracted fields → get a mismatch report and a fix plan.
 - **Positioning (use this wording):** a *self-check for your own documents*. It does not verify identity, does not contact any government system, and is not legal advice.
 - **Why it is not "just ask a chatbot":** OCR only reads text off the image, on the user's own phone. All comparison is deterministic, tested code built around Indian naming conventions, with every rule traceable to a source.
 
@@ -38,7 +38,7 @@ Read this whole file before doing anything. Save it in the repo root as `HANDOFF
 | Fields: full name, date of birth, parent/guardian name, gender | Storing any document or field |
 | Input modes: cropped photo, typed, sample | Address comparison |
 | Purposes: General check, PAN–Aadhaar linking, PF (EPF) claim | Regional-script name matching |
-| English UI (strings externalised for later Hindi and Tamil) | Chatbot, voice, PDF export |
+| English, Hindi and Marathi UI | Chatbot, voice, PDF export |
 | Anonymous aggregate counters | Analytics SDKs, trackers, cookies |
 
 ## 3. Architecture (decided)
@@ -61,7 +61,7 @@ flowchart LR
 - **API:** API Gateway HTTP API → one Lambda (Python, latest runtime supported by SAM; record the version). Use AWS Lambda Powertools (logger, event handler) and pydantic for validation.
 - **Infra as code:** AWS SAM, one `template.yaml`. No console click-ops except what section 8 lists for the human.
 - **Extraction (pluggable `Extractor` interface, selected by env var `EXTRACTOR`):**
-  1. `client_ocr` (DEFAULT): the browser crops the photo and runs Tesseract.js (English, LSTM-only) on the device. Tesseract.js is lazy-loaded only when photo mode is used; its worker, core and language model are self-hosted with the site (no third-party CDN). The client removes digit runs of 9+ characters and 4-4-4 grouped digits from the lines (dates are kept), shows the user the crop and the exact lines, and sends only those lines. The server runs the deterministic per-doc-type parsers (label/regex based; passport MRZ parser when an MRZ is present) and the ID guard on the text. **The image is never uploaded.**
+  1. `client_ocr` (DEFAULT): the browser runs Tesseract.js (English, LSTM-only) on the chosen photo on the device. Tesseract.js is lazy-loaded only when photo mode is used; its worker, core and language model are self-hosted with the site (no third-party CDN). The client removes digit runs of 9+ characters and 4-4-4 grouped digits from the lines (dates are kept), shows the user the local preview and exact lines, and sends only those lines after explicit consent. The server runs the deterministic per-doc-type parsers (label/regex based; passport MRZ parser when an MRZ is present) and the ID guard on the text. **The image is never uploaded.**
   2. `bedrock` (OFF; future): a model structures the same fields. Same region only (no cross-region inference profiles); needs architect approval. It is the only metered extractor, so the daily cap applies to it.
   3. Typed mode and sample mode never call extraction.
   Textract was removed (2026-11-16): it may retain content for service improvement unless an AWS Organizations AI-services opt-out policy is set, and creating an Organization ends Free plan credits. **Never create an AWS Organization or enable IAM Identity Center.** See `docs/build-summary.md`.
@@ -145,7 +145,7 @@ Unverified rules must be worded "may". You may propose new rules with official s
 
 Private entities are not permitted to collect or keep copies of Aadhaar cards under the Aadhaar Act, and UIDAI recommends masked Aadhaar. The design must make it true that we never receive an Aadhaar number.
 
-1. **Photos stay on the device.** Crop is mandatory for photo input; OCR runs in the browser on the crop only, and the image is never uploaded. The UI shows the crop and the exact text lines that will be sent, and lets the user untick lines. Before sending, the client removes digit runs of 9+ characters and 4-4-4 grouped digits (dates are kept). For Aadhaar, show guidance to exclude the number, photo and QR code, and recommend masked Aadhaar.
+1. **Photos stay on the device.** OCR runs in the browser on the chosen photo only, and the image is never uploaded. The UI shows a local preview and the exact text lines that will be sent, and lets the user untick lines. Before sending, the client removes digit runs of 9+ characters and 4-4-4 grouped digits (dates are kept). For Aadhaar, show guidance to exclude the number, photo and QR code, and recommend masked Aadhaar.
 2. **No persistence:** OCR text and field values exist only in Lambda memory for the request. No S3 writes, no DynamoDB writes of fields, no temp files left behind.
 3. **ID-number guard (server, defence in depth):** on the received text, discard everything and return `422 id_number_detected` asking the user to re-crop if: in an Aadhaar/"other" crop, the text contains any 12-digit number (with or without spaces) or a PAN-format string; in any other crop, it contains a Verhoeff-valid 12-digit number. Never log or return the match.
 4. **Logging:** never log request bodies, OCR text, field values or images. Log only: request id, route, doc_type, status code, latency, extractor, error code. Disable API Gateway body logging. Add a unit test that fails if a log record contains any field value from the test payload.
@@ -177,7 +177,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 ## 7. Frontend and design system
 
-- **Stack:** React + Vite + TypeScript, Tailwind CSS, shadcn/ui (Button, Card, Dialog, Tabs, Alert, Progress), Motion for animation, `react-easy-crop` (or equivalent maintained crop library) and Tesseract.js (lazy-loaded, self-hosted assets) for on-device OCR. At most two React Bits text effects. No GSAP.
+- **Stack:** React + Vite + TypeScript, Tailwind CSS, Motion for animation and Tesseract.js (lazy-loaded, self-hosted assets) for on-device OCR. At most two React Bits text effects. No GSAP.
 - **Reference:** vinhack.vinnovateit.com is effective because of numbered navigation, huge uppercase display type split across short lines, `//` separators, flip cards, a ticket-style pass, a multilingual wordmark and a casual first-person voice. Adapt, do not copy: no film/sticker motifs, no flip-card grid.
 - **Our concept: "the document desk".** Paper, ink and rubber stamps.
   - Palette: paper `#F6F1E7`, ink navy `#14213D`, stamp red `#C8322B` (mismatch), green `#1F7A4D` (match), amber `#E9A23B` (risky). Check WCAG AA contrast and adjust shades if needed.
@@ -188,7 +188,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 - **Voice:** plain, second person, short sentences. No hype words.
 - **Motion:** scroll-triggered reveals and the stamp only; all disabled under `prefers-reduced-motion`.
 - **Budgets:** Lighthouse mobile performance >= 90, accessibility >= 95; initial JS <= 200 KB gzipped; LCP < 2.5 s on throttled 4G; full keyboard operation; visible focus; all states announced to screen readers; touch targets >= 44 px.
-- **i18n:** all UI strings in `src/strings/en.json` from the start.
+- **i18n:** UI copy lives in `src/utils/i18n.ts`; English, Hindi and Marathi are available.
 
 ## 8. What the human does (not you)
 
@@ -243,7 +243,7 @@ Cut line: if time is short, Phase 4 shrinks to palette, type and the report diff
 HANDOFF.md  CLAUDE.md  README.md  template.yaml
 engine/            # pure comparison logic + rules.yaml
 backend/           # handler, extractors/, parsers/, validation, counters
-frontend/          # Vite app: src/components, src/routes, src/strings, src/lib
+frontend/          # Vite app: src/components, src/utils, src/lib, src/types
 tests/             # engine/, backend/, e2e/
 docs/              # build-summary.md, facts.md, privacy.md
 logs/              # phase-N.md

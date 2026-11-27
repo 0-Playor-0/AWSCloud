@@ -10,9 +10,9 @@ It does not verify identity, does not contact any government system and is not l
 
 ## How it works
 
-- **On your phone:** crop a photo; Tesseract.js reads the text in the browser; long numbers are
-  removed; you see and can untick every line before anything is sent. Or type the details, or try
-  a sample.
+- **On your phone:** choose a photo; self-hosted Tesseract.js reads the text in the browser; long
+  numbers are removed; you see and can untick every line before explicitly consenting to send it.
+  Or type the details, or try a sample.
 - **On AWS (Sydney, `ap-southeast-2`):** one Lambda parses the text into four fields and compares
   documents with a deterministic, tested rules engine (`engine/`, every rule with a source). Nothing
   is stored except anonymous counts. See [docs/privacy.md](docs/privacy.md).
@@ -33,7 +33,7 @@ Full spec: [HANDOFF.md](HANDOFF.md).
 |---|---|
 | `engine/` | Pure comparison logic and `rules.yaml` |
 | `backend/` | Lambda handler, parsers, ID guard, validation, counters |
-| `frontend/` | React + Vite + TypeScript site (`src/strings/en.json` holds all UI text) |
+| `frontend/` | Newspaper-style React + Vite + TypeScript site with self-hosted fonts and OCR |
 | `tests/` | Python unit and integration tests; Playwright e2e lives in `frontend/e2e/` |
 | `template.yaml` | Everything on AWS (SAM) |
 | `scripts/` | Preflight, site deploy, API smoke test, local API |
@@ -51,7 +51,7 @@ python3.14 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ```
 
 ```bash
-cd frontend && npm ci && npm test && npm run lint
+cd frontend && npm ci && npm test && npm run lint && npm run build
 ```
 
 Run the site against a local copy of the API (the real handler; counters in memory):

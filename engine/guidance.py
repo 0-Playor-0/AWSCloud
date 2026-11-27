@@ -22,13 +22,45 @@ DOCUMENT_TYPES = tuple(DOC_LABELS)
 
 _CODE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _SOURCE_ID = re.compile(r"^[a-z][a-z0-9_]*$")
-_HTTPS_URL = re.compile(r"^https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s]*)?$")
-_FORBIDDEN_CLAIMS = (
-    "guaranteed correction",
-    "identity is verified",
-    "identity verified",
-    "legally eligible",
-    "will be corrected",
+_HTTPS_URL = re.compile(
+    r"^https://(?P<host>[A-Za-z0-9.-]+)(?:[/?#][^\s]*)?$"
+)
+APPROVED_SOURCE_HOSTS = {
+    "uidai_updates": "uidai.gov.in",
+    "pan_correction": "pan.utiitsl.com",
+    "passport_change": "passportindia.gov.in",
+    "cbse_correction": "cbse.gov.in",
+    "rbi_kyc": "rbi.org.in",
+    "pan_aadhaar_linking": "incometax.gov.in",
+    "epfo_member_faq": "epfo.gov.in",
+}
+_FORBIDDEN_CLAIM_PATTERNS = (
+    re.compile(
+        r"\bidentity (?:has been|is|was) (?:\w+ly )?"
+        r"(?:verified|confirmed|validated|authenticated)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:we|service) (?:have |has )?verified (?:your|the) identity\b", re.IGNORECASE),
+    re.compile(r"\bverified identity\b", re.IGNORECASE),
+    re.compile(r"\bidentity verification (?:is|has been) complete\b", re.IGNORECASE),
+    re.compile(r"\b(?:you|users?) (?:are|will be) eligible\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:you|users?) (?:qualify|meet the eligibility criteria|are entitled)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\beligible (?:to|for)\b", re.IGNORECASE),
+    re.compile(r"\blegal(?:ly)? eligible\b", re.IGNORECASE),
+    re.compile(
+        r"\beligibility (?:is|has been) (?:confirmed|determined|established|verified|guaranteed)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bguarantee(?:d|s)?\b", re.IGNORECASE),
+    re.compile(r"\bwill be (?:granted|approved|accepted|corrected)\b", re.IGNORECASE),
+    re.compile(
+        r"\bcorrection (?:is|has been|will be) (?:\w+ly )?"
+        r"(?:assured|guaranteed|granted|approved|accepted|completed|successful)\b",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -86,12 +118,19 @@ def _text(item: dict[str, Any], key: str, label: str) -> str:
     return value.strip()
 
 
-def _texts(value: Any, label: str) -> tuple[str, ...]:
+def _texts(value: Any, label: str, *, allow_empty: bool = True) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise ValueError(f"{label} must be a list")
     if any(not isinstance(item, str) or not item.strip() for item in value):
         raise ValueError(f"{label} must contain non-empty text")
-    return tuple(item.strip() for item in value)
+    items = tuple(item.strip() for item in value)
+    if not allow_empty and not items:
+        raise ValueError(f"{label} must not be empty")
+    return items
+
+
+def _contains_forbidden_claim(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _FORBIDDEN_CLAIM_PATTERNS)
 
 
 def _source_ids(value: Any, sources: dict[str, Source], label: str) -> tuple[str, ...]:
@@ -109,8 +148,15 @@ def _source(source_id: str, item: Any) -> Source:
     item = _mapping(item, label)
     _require_keys(item, {"label", "url", "authority", "status", "verified_on"}, label)
     source_url = _text(item, "url", label)
-    if not _HTTPS_URL.fullmatch(source_url):
+    url_match = _HTTPS_URL.fullmatch(source_url)
+    if not url_match:
         raise ValueError(f"{label}.url must be an HTTPS URL without credentials")
+    approved_host = APPROVED_SOURCE_HOSTS.get(source_id)
+    host = url_match.group("host").lower()
+    if approved_host is None or not (
+        host == approved_host or host.endswith(f".{approved_host}")
+    ):
+        raise ValueError(f"{label}.url must use the approved official host")
     status = _text(item, "status", label)
     if status not in SOURCE_STATUSES:
         raise ValueError(f"{label}.status is invalid")
@@ -165,7 +211,7 @@ def _template(item: Any, label: str) -> GuidanceTemplate:
         priority=priority,
         why_it_matters=_text(item, "why_it_matters", label),
         recommended_action=_text(item, "recommended_action", label),
-        steps=_texts(item.get("steps"), f"{label}.steps"),
+        steps=_texts(item.get("steps"), f"{label}.steps", allow_empty=False),
     )
     claims = " ".join(
         (
@@ -175,8 +221,8 @@ def _template(item: Any, label: str) -> GuidanceTemplate:
             template.recommended_action,
             *template.steps,
         )
-    ).lower()
-    if any(claim in claims for claim in _FORBIDDEN_CLAIMS):
+    )
+    if _contains_forbidden_claim(claims):
         raise ValueError(f"{label} contains an unsupported claim")
     return template
 
@@ -214,6 +260,8 @@ def load_guidance(path: Path = GUIDANCE_PATH) -> GuidanceCatalogue:
         raise ValueError("guidance.version must be 1")
 
     source_items = _mapping(raw["sources"], "guidance.sources")
+    if set(source_items) != set(APPROVED_SOURCE_HOSTS):
+        raise ValueError("guidance.sources must contain every approved source")
     sources: dict[str, Source] = {}
     for source_id, item in source_items.items():
         if not _SOURCE_ID.fullmatch(source_id):
@@ -242,8 +290,9 @@ def load_guidance(path: Path = GUIDANCE_PATH) -> GuidanceCatalogue:
     purpose_steps: dict[str, tuple[str, ...]] = {}
     for purpose, items in purpose_step_items.items():
         steps = _texts(items, f"guidance.purpose_steps.{purpose}")
-        claims = " ".join(steps).lower()
-        if any(claim in claims for claim in _FORBIDDEN_CLAIMS):
+        if purpose != "general" and not steps:
+            raise ValueError(f"guidance.purpose_steps.{purpose} must not be empty")
+        if _contains_forbidden_claim(" ".join(steps)):
             raise ValueError(f"guidance.purpose_steps.{purpose} contains an unsupported claim")
         purpose_steps[purpose] = steps
 
@@ -277,6 +326,8 @@ def load_guidance(path: Path = GUIDANCE_PATH) -> GuidanceCatalogue:
         raise ValueError("guidance.fallback must not claim review-first urgency")
 
     disclaimer = _text(raw, "disclaimer", "guidance")
+    if _contains_forbidden_claim(disclaimer):
+        raise ValueError("guidance.disclaimer contains an unsupported claim")
     return GuidanceCatalogue(
         disclaimer=disclaimer,
         sources=sources,
