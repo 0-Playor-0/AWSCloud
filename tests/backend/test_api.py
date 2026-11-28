@@ -100,10 +100,11 @@ def test_compare_contract_and_stats(fakes, call) -> None:
     assert status == 200
     assert set(body) == {"summary", "findings", "fix_plan", "guidance", "disclaimer"}
     assert body["summary"]["status"] == "mismatches_found"
-    assert body["summary"]["counts"] == {"blocking": 2, "risky": 0, "cosmetic": 0}
-    assert [item["code"] for item in body["guidance"]] == [
-        "NAME_INITIALS_VS_EXPANDED",
+    # EPF: the name finding stays risky (R-EPF-MISMATCH annotates, no longer raises); DOB blocking
+    assert body["summary"]["counts"] == {"blocking": 1, "risky": 1, "cosmetic": 0}
+    assert [item["code"] for item in body["guidance"]] == [  # blocking (DOB) sorts first
         "DOB_OFF_BY_SMALL",
+        "NAME_INITIALS_VS_EXPANDED",
     ]
     assert [item["finding_index"] for item in body["guidance"]] == [0, 1]
     assert "RAVI" not in json.dumps(body["guidance"])
@@ -142,7 +143,7 @@ def test_compare_all_match_returns_empty_guidance(fakes, call) -> None:
     "mutate",
     [
         lambda guidance: guidance[0].update(priority="critical"),
-        lambda guidance: guidance[0].update(code="DOB_OFF_BY_SMALL"),
+        lambda guidance: guidance[0].update(code="NAME_INITIALS_VS_EXPANDED"),
         lambda guidance: guidance[0]["official_references"][0].update(url="http://example.test"),
         lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-99-99"),
         lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-11-26"),

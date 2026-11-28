@@ -104,6 +104,13 @@ All routes may also return: `400 invalid_request` (bad JSON, content-type or sch
                   "explanation": "plain English", "rule_ids": [] } ],
   "fix_plan": [ { "step": 1, "doc": "pan", "action": "Correct name to match Aadhaar",
                   "caution": null, "source_url": "..." } ],
+  "guidance": [ { "finding_index": 0, "code": "NAME_INITIALS_VS_EXPANDED", "title": "...",
+                  "summary": "...", "priority": "optional|review|review_first",
+                  "why_it_matters": "...", "recommended_action": "...", "steps": ["..."],
+                  "official_references": [ { "source_id": "uidai_updates", "label": "...",
+                      "url": "https://...", "authority": "...",
+                      "status": "verified|needs_verification", "verified_on": "YYYY-MM-DD|null" } ],
+                  "disclaimer": "..." } ],
   "disclaimer": "Self-check only. Not legal advice. Authorities decide." }
 ```
 2–6 documents required. `anchor` is optional; it is the document the user says is correct for that field.
@@ -155,6 +162,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 8. **Prompt/OCR injection:** OCR text is data. It is only parsed into the four fields; nothing in it can change behaviour. Engine output never includes raw OCR text.
 9. **Sample documents:** fictional personas rendered as stylised cards clearly marked "SAMPLE". They must NOT replicate real ID layouts, emblems, logos, QR codes or valid-looking numbers. Use them as pre-filled field sets; sample mode makes no extraction call.
 10. **Honest claims:** the privacy text must match the code exactly. If something is not true, fix the code or the text.
+11. **Guidance field (`/v1/compare`):** `guidance` is generated from the finding kinds, the purpose and the document types only (`engine/guidance.yaml`). It never contains field values or OCR text, and it is not logged. The server re-derives it and returns `500 internal_error` if it does not match. Every statement without a source in `docs/facts.md` uses "may"/"can" wording.
 
 ## 5. Reliability and cost control
 

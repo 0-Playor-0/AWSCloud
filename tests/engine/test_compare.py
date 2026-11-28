@@ -93,21 +93,40 @@ def test_anchor_compares_against_anchor_only() -> None:
 
 # --- purpose rules ---------------------------------------------------------------------------
 
-def test_epf_raises_risky_name_with_aadhaar_to_blocking() -> None:
+@pytest.mark.parametrize(
+    "docs,severity,rule_ids,note",
+    [
+        # Name findings stay risky for EPF (no longer raised to blocking) and say "may be rejected".
+        ([("aadhaar", "K RAVI"), ("passbook", "RAVI KUMAR")], "risky", ["R-EPF-MISMATCH"],
+         "may be rejected"),
+        ([("pan", "K RAVI"), ("passbook", "RAVI KUMAR")], "risky", ["R-EPF-MISMATCH"],
+         "may be rejected"),
+        # Cosmetic findings get no annotation.
+        ([("aadhaar", "R.K. SHARMA"), ("pan", "RK SHARMA")], "cosmetic", [], None),
+    ],
+)
+def test_epf_name_findings(docs, severity, rule_ids, note) -> None:
+    f = compare("epf_claim", [doc(t, n) for t, n in docs])["findings"][0]
+    assert f["severity"] == severity and f["rule_ids"] == rule_ids
+    if note:
+        assert note in f["explanation"]
+        assert "commonly rejected" not in f["explanation"]  # the source does not cover names
+
+
+def test_epf_name_never_raised_above_general() -> None:
     docs = [doc("aadhaar", "K RAVI"), doc("passbook", "RAVI KUMAR")]
-    assert compare("general", docs)["findings"][0]["severity"] == "risky"
+    general = compare("general", docs)["findings"][0]["severity"]
+    assert compare("epf_claim", docs)["findings"][0]["severity"] == general == "risky"
+
+
+def test_epf_dob_stays_blocking_with_sourced_statement() -> None:
+    docs = [doc("aadhaar", "RAVI", dob="2007-03-14"), doc("passbook", "RAVI", dob="2007-04-14")]
     f = compare("epf_claim", docs)["findings"][0]
-    assert f["severity"] == "blocking" and f["rule_ids"] == ["R-EPF-MISMATCH"]
-
-
-def test_epf_does_not_raise_without_aadhaar() -> None:
-    f = compare("epf_claim", [doc("pan", "K RAVI"), doc("passbook", "RAVI KUMAR")])["findings"][0]
-    assert f["severity"] == "risky" and f["rule_ids"] == []
-
-
-def test_epf_does_not_raise_cosmetic() -> None:
-    f = compare("epf_claim", [doc("aadhaar", "R.K. SHARMA"), doc("pan", "RK SHARMA")])
-    assert f["findings"][0]["severity"] == "cosmetic"
+    assert f["field"] == "dob" and f["severity"] == "blocking"
+    assert f["rule_ids"] == ["R-EPF-MISMATCH"]
+    assert "commonly rejected when the date of birth, Aadhaar details or bank details" in (
+        f["explanation"]
+    )
 
 
 def test_pan_aadhaar_link_annotates_with_may() -> None:

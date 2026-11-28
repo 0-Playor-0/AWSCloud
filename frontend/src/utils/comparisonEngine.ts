@@ -27,14 +27,14 @@ export const PURPOSE_OPTIONS: {
     title: 'PAN–Aadhaar linking',
     shortHint: 'Check the fields that must match to link PAN and Aadhaar.',
     anchorRule:
-      'PAN–Aadhaar linking fails when Name, Date of Birth (full DD/MM/YYYY), or Gender differ between PAN and Aadhaar.',
+      'PAN–Aadhaar linking may fail when Name, Date of Birth (full DD/MM/YYYY), or Gender differ between PAN and Aadhaar.',
   },
   {
     id: 'epf_claim',
     title: 'PF (EPF) claim',
     shortHint: 'Check the fields that often cause EPF claim rejections.',
     anchorRule:
-      'EPF claims are commonly rejected when Name, Date of Birth, Aadhaar, or Bank Passbook details do not align.',
+      'EPF claims are commonly rejected when the Date of Birth, Aadhaar details or bank details do not match. A Name difference may also lead to rejection.',
   },
 ];
 
@@ -428,7 +428,7 @@ function compareDobs(
       return {
         severity: 'variation',
         summary:
-          'Birth year matches, but one document only prints the year instead of DD/MM/YYYY. Full date is required for PAN–Aadhaar linking and EPF.',
+          'Birth year matches, but one document only prints the year instead of DD/MM/YYYY. PAN–Aadhaar linking and EPF claims may need the full date.',
         outliers,
         majorityNorm: fullDates[0].canonical,
       };
@@ -664,9 +664,9 @@ function buildPriorityGuidance(
     return {
       reviewFirstDoc: topOutlierDoc,
       reason:
-        'EPF claims are commonly rejected when Name, Date of Birth, Aadhaar, or Bank Passbook records differ — especially swapped DD/MM dates or post-marriage surname drift.',
+        'EPF claims are commonly rejected when the Date of Birth, Aadhaar details or bank details differ, for example swapped DD/MM dates. A Name difference, such as a surname change after marriage, may also lead to rejection.',
       steps: [
-        `Fix ${topOutlierDoc} first if it differs from your UAN/Aadhaar profile (updating a bank passbook KYC or employer joint declaration is often faster than editing Aadhaar).`,
+        `Fix ${topOutlierDoc} first if it differs from your UAN/Aadhaar profile (updating a bank passbook KYC or employer joint declaration may be faster than editing Aadhaar, which has strict update limits).`,
         'Ensure your bank passbook and Aadhaar share the exact same DD/MM/YYYY birth date and spelling.',
       ],
     };

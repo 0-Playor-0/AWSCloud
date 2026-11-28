@@ -16,15 +16,16 @@ rules:
   - id: R-EPF-MISMATCH
     applies_to: [epf_claim]
     statement: >-
-      EPF claims are commonly rejected when the name, date of birth, Aadhaar or bank details do
+      EPF claims are commonly rejected when the date of birth, Aadhaar details or bank details do
       not match.
     effect:
-      type: raise_severity
+      type: annotate
       purpose: epf_claim
-      field: name
-      involves_doc: aadhaar
-      from: risky
-      to: blocking
+      fields: [name, dob]
+      involves_docs: []
+      # The source does not single out names, so name findings keep their severity and say "may".
+      field_notes:
+        name: An EPF claim may be rejected when the name differs between your records.
     source_url: https://www.outlookmoney.com/retirement/pension/epf-claim-settlement-why-epfo-rejects-the-claims-and-what-subscribers-can-do
     verified: secondary
 

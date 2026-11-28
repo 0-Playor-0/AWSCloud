@@ -64,8 +64,8 @@ purpose_steps:
   general: []
   pan_aadhaar_link:
     - >-
-      For PAN-Aadhaar linking, the Income Tax Department says to correct either PAN or Aadhaar so
-      that the details match, then follow the current official linking instructions.
+      PAN-Aadhaar linking may fail while the details differ. You may need to correct either PAN or
+      Aadhaar so that they match; follow the Income Tax Department's current linking instructions.
   epf_claim:
     - >-
       If your EPF or UAN record also differs, use EPFO's current official guidance for correcting
@@ -109,7 +109,7 @@ guidance:
     summary: "One document uses initials where the other spells the name out."
     priority: review
     why_it_matters: >-
-      Initials are common in Indian records, but some applications require the expanded name.
+      Initials are common in Indian records, but some applications may require the expanded name.
     recommended_action: >-
       Confirm the expansion from an original document and check whether the intended service requires
       the full form.
@@ -204,7 +204,7 @@ guidance:
     summary: "One document uses initials where the other spells the name out."
     priority: review
     why_it_matters: >-
-      Initials are common in Indian records, but some applications require the expanded name.
+      Initials are common in Indian records, but some applications may require the expanded name.
     recommended_action: >-
       Confirm the expansion from an original document and check whether the intended service requires
       the full form.
@@ -316,7 +316,8 @@ guidance:
     summary: "More than one component of the date of birth differs between the documents."
     priority: review_first
     why_it_matters: >-
-      The records may represent different dates, and some services compare the full date literally.
+      The records may represent different dates, and some services may compare the full date
+      literally.
     recommended_action: >-
       Do not assume either record is wrong. Confirm the correct date from authoritative records first,
       then follow the relevant issuer's process if a record is wrong.
@@ -332,8 +333,7 @@ guidance:
     summary: "The documents record different gender values."
     priority: review_first
     why_it_matters: >-
-      Some applications use gender as a matching field, while others do not. This check does not
-      verify identity.
+      Some applications may use gender as a matching field. This check does not verify identity.
     recommended_action: >-
       Confirm which record is wrong from an original source before asking an issuer to change it. Do
       not change a gender record simply to make two documents match.

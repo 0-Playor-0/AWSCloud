@@ -135,7 +135,7 @@ def _apply_rules(
             and severity in ACTIONABLE
         ):
             rule_ids.append(rule.id)
-            notes.append(rule.statement)
+            notes.append(effect.get("field_notes", {}).get(field, rule.statement))
     return severity, rule_ids, notes
 
 
