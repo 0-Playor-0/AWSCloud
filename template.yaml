@@ -92,6 +92,7 @@ Resources:
       MemorySize: 512
       Timeout: 20
       ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref ReservedConcurrency, !Ref "AWS::NoValue"]
+      Role: !GetAtt ApiFunctionRole.Arn
       LoggingConfig:
         LogGroup: !Ref FunctionLogs
         LogFormat: JSON
@@ -103,11 +104,6 @@ Resources:
           GIT_SHA: !Ref GitSha
           POWERTOOLS_SERVICE_NAME: namma-check
           POWERTOOLS_LOGGER_LOG_EVENT: "false"
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action: [dynamodb:UpdateItem, dynamodb:GetItem]
-              Resource: !GetAtt CountersTable.Arn
       Events:
         Extract:
           Type: HttpApi
@@ -126,6 +122,149 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 14
+
+  ApiFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: NammaCheckFunctionAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CreateFunctionLogGroup
+                Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${FunctionLogs}
+              - Sid: WriteFunctionLogStreams
+                Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${FunctionLogs}:*
+              - Sid: UseCounterTable
+                Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+                Resource: !GetAtt CountersTable.Arn
+
+  # --- Operations dashboard (standard service metrics only) ------------------------------------
+
+  OperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "${AWS::StackName}-operations"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+              "properties": {"markdown": "# Namma Check operations\nRegion: ${AWS::Region} - request flow, execution and counter activity"}
+            },
+            {
+              "type": "text", "x": 0, "y": 2, "width": 24, "height": 1,
+              "properties": {"markdown": "## API Gateway"}
+            },
+            {
+              "type": "metric", "x": 0, "y": 3, "width": 6, "height": 6,
+              "properties": {
+                "title": "API requests", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/ApiGateway", "Count", "ApiId", "${HttpApi}", "Stage", "$default"]]
+              }
+            },
+            {
+              "type": "metric", "x": 6, "y": 3, "width": 6, "height": 6,
+              "properties": {
+                "title": "API 4xx responses", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/ApiGateway", "4xx", "ApiId", "${HttpApi}", "Stage", "$default"]]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 3, "width": 6, "height": 6,
+              "properties": {
+                "title": "API 5xx responses", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/ApiGateway", "5xx", "ApiId", "${HttpApi}", "Stage", "$default"]]
+              }
+            },
+            {
+              "type": "metric", "x": 18, "y": 3, "width": 6, "height": 6,
+              "properties": {
+                "title": "API latency (ms)", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Average",
+                "metrics": [["AWS/ApiGateway", "Latency", "ApiId", "${HttpApi}", "Stage", "$default"]]
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 9, "width": 24, "height": 1,
+              "properties": {"markdown": "## Lambda"}
+            },
+            {
+              "type": "metric", "x": 0, "y": 10, "width": 5, "height": 6,
+              "properties": {
+                "title": "Lambda invocations", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/Lambda", "Invocations", "FunctionName", "${ApiFunction}"]]
+              }
+            },
+            {
+              "type": "metric", "x": 5, "y": 10, "width": 5, "height": 6,
+              "properties": {
+                "title": "Lambda errors", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/Lambda", "Errors", "FunctionName", "${ApiFunction}"]]
+              }
+            },
+            {
+              "type": "metric", "x": 10, "y": 10, "width": 5, "height": 6,
+              "properties": {
+                "title": "Lambda average duration (ms)", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Average",
+                "metrics": [["AWS/Lambda", "Duration", "FunctionName", "${ApiFunction}"]]
+              }
+            },
+            {
+              "type": "metric", "x": 15, "y": 10, "width": 5, "height": 6,
+              "properties": {
+                "title": "Lambda throttles", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/Lambda", "Throttles", "FunctionName", "${ApiFunction}"]]
+              }
+            },
+            {
+              "type": "metric", "x": 20, "y": 10, "width": 4, "height": 6,
+              "properties": {
+                "title": "Lambda concurrent executions", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Maximum",
+                "metrics": [["AWS/Lambda", "ConcurrentExecutions", "FunctionName", "${ApiFunction}"]]
+              }
+            },
+            {
+              "type": "text", "x": 0, "y": 16, "width": 24, "height": 1,
+              "properties": {"markdown": "## DynamoDB counters"}
+            },
+            {
+              "type": "metric", "x": 0, "y": 17, "width": 12, "height": 6,
+              "properties": {
+                "title": "Consumed read capacity units", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${CountersTable}"]]
+              }
+            },
+            {
+              "type": "metric", "x": 12, "y": 17, "width": 12, "height": 6,
+              "properties": {
+                "title": "Consumed write capacity units", "view": "timeSeries", "region": "${AWS::Region}",
+                "period": 300, "stat": "Sum",
+                "metrics": [["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "${CountersTable}"]]
+              }
+            }
+          ]
+        }
 
   # --- Static site: private S3 bucket behind CloudFront (Origin Access Control) ----------------
 
@@ -260,6 +399,21 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
 
+  LambdaHighDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A Lambda request took 15 seconds or longer in 5 minutes (function timeout is 20 seconds).
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions: [{Name: FunctionName, Value: !Ref ApiFunction}]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 15000
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmEmail, [!Ref AlarmTopic], !Ref "AWS::NoValue"]
+
   Api5xxRateAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -331,3 +485,6 @@ Outputs:
   DistributionId:
     Description: CloudFront distribution (for cache invalidation)
     Value: !Ref SiteDistribution
+  OperationsDashboardName:
+    Description: CloudWatch operations dashboard name
+    Value: !Ref OperationsDashboard

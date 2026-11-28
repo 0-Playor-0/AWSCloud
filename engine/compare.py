@@ -7,6 +7,7 @@ from itertools import combinations
 from typing import Any
 
 from . import dates, names
+from .guidance import PURPOSES, build_guidance, default_guidance
 from .messages import (
     ACTION_CHOOSE,
     ACTION_CONFIRM_DOB,
@@ -19,7 +20,6 @@ from .messages import (
 )
 from .rules import Rule, default_rules
 
-PURPOSES = frozenset({"general", "pan_aadhaar_link", "epf_claim"})
 FIELDS = ("name", "dob", "parent_name", "gender")
 GENDERS = frozenset({"M", "F", "O"})
 SEVERITY_RANK = {"blocking": 0, "risky": 1, "cosmetic": 2}
@@ -267,7 +267,7 @@ def compare(
     anchor: dict[str, Any] | None = None,
     rules: dict[str, Rule] | None = None,
 ) -> dict[str, Any]:
-    """Compare 2–6 documents. Pure function: no I/O beyond the cached rules file."""
+    """Compare 2–6 documents. Pure function: no I/O beyond cached rule and guidance files."""
     if purpose not in PURPOSES:
         raise EngineInputError("unknown purpose")
     rules = rules or default_rules()
@@ -291,9 +291,16 @@ def compare(
     else:
         status = "all_match"
 
+    guidance = build_guidance(
+        findings,
+        purpose,
+        {doc.id: doc.doc_type for doc in docs},
+        default_guidance(),
+    )
     return {
         "summary": {"status": status, "counts": counts},
         "findings": findings,
         "fix_plan": plan,
+        "guidance": guidance,
         "disclaimer": DISCLAIMER,
     }

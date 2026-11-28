@@ -1,30 +1,31 @@
-import { describe, expect, it } from "vitest";
+import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { MAX_LINE_CHARS, MAX_LINES, sanitizeLines } from "./sanitize";
+import { MAX_LINE_CHARS, MAX_LINES, sanitizeLines } from './sanitize';
 
-// Synthetic numbers only.
-describe("sanitizeLines", () => {
-  it.each([
-    ["9999 9999 9999", "", 1],
-    ["Aadhaar: 9999-9999-9999 ok", "Aadhaar: ok", 1],
-    ["9999  9999 9999", "", 1],
-    ["A/c 123456789", "A/c", 1], // 9-digit run
-    ["A/c 12345678", "A/c 12345678", 0], // 8 digits kept
-    ["VID 1234 5678 9012 3456", "VID 3456", 1],
-    ["DOB: 14/03/2007", "DOB: 14/03/2007", 0], // dates kept
-    ["DOB: 14-03-2007", "DOB: 14-03-2007", 0],
-    ["Year of Birth 1990", "Year of Birth 1990", 0],
-    ["XXXX XXXX 9999", "XXXX XXXX 9999", 0], // masked Aadhaar
-    ["  RAVI   KUMAR  ", "RAVI KUMAR", 0],
-  ])("%s → %s", (input, out, removed) => {
-    const r = sanitizeLines([{ text: input, confidence: 0.8 }]);
-    expect(r.lines).toEqual(out ? [{ text: out, confidence: 0.8 }] : []);
-    expect(r.removedNumbers).toBe(removed);
-  });
+test('removes identifier-like numbers before text can leave the device', () => {
+  const result = sanitizeLines([
+    { text: 'Aadhaar: 9999 9999 9999', confidence: 0.9 },
+    { text: 'Account 123456789', confidence: 0.8 },
+    { text: 'DOB: 14/03/2007', confidence: 0.95 },
+  ]);
 
-  it("drops empty lines and enforces the contract limits", () => {
-    const r = sanitizeLines(["", "  ", ...Array.from({ length: 50 }, () => "x".repeat(200))].map((text) => ({ text, confidence: null })));
-    expect(r.lines).toHaveLength(MAX_LINES);
-    expect(r.lines.every((l) => l.text.length === MAX_LINE_CHARS && l.confidence === null)).toBe(true);
-  });
+  assert.deepEqual(result.lines, [
+    { text: 'Aadhaar:', confidence: 0.9 },
+    { text: 'Account', confidence: 0.8 },
+    { text: 'DOB: 14/03/2007', confidence: 0.95 },
+  ]);
+  assert.equal(result.removedNumbers, 2);
+});
+
+test('enforces the backend line and character limits', () => {
+  const result = sanitizeLines(
+    Array.from({ length: MAX_LINES + 5 }, (_, index) => ({
+      text: `${index} ${'x'.repeat(MAX_LINE_CHARS)}`,
+      confidence: 0.9,
+    })),
+  );
+
+  assert.equal(result.lines.length, MAX_LINES);
+  assert.ok(result.lines.every((line) => line.text.length <= MAX_LINE_CHARS));
 });

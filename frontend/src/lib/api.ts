@@ -1,115 +1,287 @@
-import type { OcrLine } from "./ocr";
-import type { Anchor, ApiErrorBody, CompareResponse, DocumentEntry, DocType, ExtractResponse, Purpose } from "./types";
+import type { PreparedComparison } from './backendAdapter';
+import type {
+  BackendCompareResponse,
+  BackendDocType,
+  BackendField,
+  BackendFinding,
+  BackendGuidance,
+  ExtractResponse,
+  StatsResponse,
+} from './backendTypes';
+import type { RecognizedLine } from './ocr';
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiErrorBody; status: number };
-
-const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const BASE = (import.meta.env?.VITE_API_URL ?? '').replace(/\/$/, '');
 const TIMEOUT_MS = 30_000;
-/** One automatic retry after this pause (plus up to 50% jitter) on a busy reply (HANDOFF.md 5). */
 export const RETRY_BACKOFF_MS = 800;
 
-function isErrorBody(x: unknown): x is { error: ApiErrorBody } {
-  const e = (x as { error?: Record<string, unknown> } | null)?.error;
-  return !!e && typeof e.code === "string" && typeof e.message === "string" && typeof e.hint === "string";
+export interface ApiErrorBody {
+  code: string;
+  message: string;
+  hint: string;
 }
 
-function clientError(code: "network" | "unexpected" | "throttled", status = 0): ApiResult<never> {
-  return { ok: false, status, error: { code, message: "", hint: "" } };
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; error: ApiErrorBody };
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const BACKEND_FIELDS = new Set<BackendField>(['name', 'dob', 'parent_name', 'gender']);
+const BACKEND_SEVERITIES = new Set(['blocking', 'risky', 'cosmetic']);
+
+function isFinding(value: unknown): value is BackendFinding {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.field === 'string' &&
+    BACKEND_FIELDS.has(value.field as BackendField) &&
+    typeof value.kind === 'string' &&
+    typeof value.severity === 'string' &&
+    BACKEND_SEVERITIES.has(value.severity) &&
+    Array.isArray(value.docs) &&
+    value.docs.every((doc) => typeof doc === 'string') &&
+    isObject(value.values) &&
+    Object.values(value.values).every((fieldValue) => typeof fieldValue === 'string') &&
+    typeof value.explanation === 'string' &&
+    Array.isArray(value.rule_ids) &&
+    value.rule_ids.every((rule) => typeof rule === 'string')
+  );
 }
 
-/**
- * Classify a raw response. Exported for tests.
- * - contract error body → that error
- * - bare 429 (API Gateway throttling has no contract body) → throttled
- * - 2xx passing `valid` → data
- * - anything else → unexpected (generic retry message)
- */
-export function classify<T>(status: number, body: unknown, valid: (b: unknown) => boolean): ApiResult<T> {
-  if (status >= 200 && status < 300) {
-    return valid(body) ? { ok: true, data: body as T } : clientError("unexpected", status);
+function isOfficialReference(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.source_id === 'string' &&
+    typeof value.label === 'string' &&
+    typeof value.url === 'string' &&
+    value.url.startsWith('https://') &&
+    typeof value.authority === 'string' &&
+    (value.status === 'verified' || value.status === 'needs_verification') &&
+    (value.verified_on === null || typeof value.verified_on === 'string')
+  );
+}
+
+function isGuidance(value: unknown): value is BackendGuidance {
+  if (!isObject(value)) return false;
+  return (
+    Number.isInteger(value.finding_index) &&
+    typeof value.code === 'string' &&
+    /^[A-Z][A-Z0-9_]*$/.test(value.code) &&
+    typeof value.title === 'string' &&
+    typeof value.summary === 'string' &&
+    (value.priority === 'optional' || value.priority === 'review' || value.priority === 'review_first') &&
+    typeof value.why_it_matters === 'string' &&
+    typeof value.recommended_action === 'string' &&
+    Array.isArray(value.steps) &&
+    value.steps.every((step) => typeof step === 'string') &&
+    Array.isArray(value.official_references) &&
+    value.official_references.every(isOfficialReference) &&
+    typeof value.disclaimer === 'string'
+  );
+}
+
+function isFixStep(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  return (
+    typeof value.step === 'number' &&
+    (value.doc === null || typeof value.doc === 'string') &&
+    typeof value.action === 'string' &&
+    (value.caution === null || typeof value.caution === 'string') &&
+    (value.source_url === null || typeof value.source_url === 'string')
+  );
+}
+
+export function isCompareResponse(value: unknown): value is BackendCompareResponse {
+  if (!isObject(value) || !isObject(value.summary)) return false;
+  if (
+    value.summary.status !== 'all_match' &&
+    value.summary.status !== 'minor_differences' &&
+    value.summary.status !== 'mismatches_found'
+  ) {
+    return false;
   }
-  if (isErrorBody(body)) return { ok: false, status, error: body.error };
-  if (status === 429) return clientError("throttled", status);
-  return clientError("unexpected", status);
+  const counts = value.summary.counts;
+  return (
+    isObject(counts) &&
+    ['blocking', 'risky', 'cosmetic'].every(
+      (severity) => typeof counts[severity] === 'number',
+    ) &&
+    Array.isArray(value.findings) &&
+    value.findings.every(isFinding) &&
+    Array.isArray(value.fix_plan) &&
+    value.fix_plan.every(isFixStep) &&
+    Array.isArray(value.guidance) &&
+    value.guidance.every(isGuidance) &&
+    typeof value.disclaimer === 'string'
+  );
 }
 
-async function request<T>(path: string, init: RequestInit, valid: (b: unknown) => boolean): Promise<ApiResult<T>> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  let res: Response;
-  try {
-    res = await fetch(BASE + path, { ...init, signal: ctrl.signal });
-  } catch {
-    clearTimeout(timer);
-    return clientError("network");
+function isExtractResponse(value: unknown): value is ExtractResponse {
+  if (
+    !isObject(value) ||
+    !isObject(value.fields) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every((warning) => typeof warning === 'string')
+  ) {
+    return false;
   }
-  let body: unknown = null;
-  try {
-    body = await res.json();
-  } catch {
-    body = null; // non-JSON reply: classified below
-  } finally {
-    clearTimeout(timer);
+  const fields = value.fields;
+  return ['name', 'dob', 'parent_name', 'gender'].every((field) => {
+    const extracted = fields[field];
+    return (
+      isObject(extracted) &&
+      (extracted.value === null || typeof extracted.value === 'string') &&
+      typeof extracted.confidence === 'number' &&
+      Number.isFinite(extracted.confidence) &&
+      extracted.confidence >= 0 &&
+      extracted.confidence <= 1 &&
+      (extracted.precision === undefined ||
+        extracted.precision === null ||
+        extracted.precision === 'day' ||
+        extracted.precision === 'year')
+    );
+  });
+}
+
+function errorBody(value: unknown): ApiErrorBody | null {
+  if (!isObject(value) || !isObject(value.error)) return null;
+  const error = value.error;
+  if (
+    typeof error.code !== 'string' ||
+    typeof error.message !== 'string' ||
+    typeof error.hint !== 'string'
+  ) {
+    return null;
   }
-  return classify<T>(res.status, body, valid);
+  return { code: error.code, message: error.message, hint: error.hint };
 }
 
-/**
- * Busy replies worth one quiet retry: 503 (Lambda at its concurrency limit) and a throttled 429
- * (bare from API Gateway or in contract shape). Never daily_cap_reached, which is also a 429.
- * /v1/extract also retries a 502 (extractor_failed) once.
- */
-export function isRetryable(r: ApiResult<unknown>, alsoRetry502 = false): boolean {
-  if (r.ok) return false;
-  return r.status === 503 || r.error.code === "throttled" || (alsoRetry502 && r.status === 502);
-}
-
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function requestWithRetry<T>(
-  path: string, init: RequestInit, valid: (b: unknown) => boolean, alsoRetry502 = false,
+async function requestOnce<T>(
+  path: string,
+  init: RequestInit,
+  valid: (body: unknown) => body is T,
 ): Promise<ApiResult<T>> {
-  const first = await request<T>(path, init, valid);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const response = await fetch(`${BASE}${path}`, { ...init, signal: controller.signal });
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error:
+          errorBody(body) ?? {
+            code: response.status === 429 ? 'throttled' : 'unexpected',
+            message: 'The service did not accept the request.',
+            hint: 'Please try again in a moment.',
+          },
+      };
+    }
+    if (!valid(body)) {
+      return {
+        ok: false,
+        status: response.status,
+        error: {
+          code: 'unexpected',
+          message: 'The service returned an invalid response.',
+          hint: 'Please try again in a moment.',
+        },
+      };
+    }
+    return { ok: true, data: body };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      error: {
+        code: 'network',
+        message: 'The service could not be reached.',
+        hint: 'Check that the local API is running, then try again.',
+      },
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isRetryable(result: ApiResult<unknown>, alsoRetry502 = false): boolean {
+  if (result.ok) return false;
+  return (
+    result.status === 503 ||
+    result.error.code === 'throttled' ||
+    (alsoRetry502 && result.status === 502)
+  );
+}
+
+const pause = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function requestJson<T>(
+  path: string,
+  init: RequestInit,
+  valid: (body: unknown) => body is T,
+  alsoRetry502 = false,
+): Promise<ApiResult<T>> {
+  const first = await requestOnce(path, init, valid);
   if (!isRetryable(first, alsoRetry502)) return first;
   await pause(RETRY_BACKOFF_MS * (1 + Math.random() * 0.5));
-  return request<T>(path, init, valid);
+  return requestOnce(path, init, valid);
 }
 
 function postJson(body: unknown): RequestInit {
-  return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
-}
-
-const isObj = (b: unknown): b is Record<string, unknown> => typeof b === "object" && b !== null;
-const validExtract = (b: unknown) => isObj(b) && isObj(b.fields) && Array.isArray(b.warnings);
-const validCompare = (b: unknown) =>
-  isObj(b) && isObj(b.summary) && Array.isArray(b.findings) && Array.isArray(b.fix_plan);
-
-/** POST /v1/extract with on-device OCR text only; one retry on 502, 503 or throttled. */
-export async function extract(docType: DocType, lines: OcrLine[]): Promise<ApiResult<ExtractResponse>> {
-  const confidence = lines.map((l) => l.confidence);
-  const init = postJson({
-    doc_type: docType,
-    ocr_lines: lines.map((l) => l.text),
-    // only when every line has one (contract: same length as ocr_lines)
-    ...(confidence.every((c) => c !== null) ? { ocr_confidence: confidence.map((c) => Math.round(c * 100) / 100) } : {}),
-  });
-  return requestWithRetry<ExtractResponse>("/v1/extract", init, validExtract, true);
-}
-
-export function compare(purpose: Purpose, docs: DocumentEntry[], anchor: Anchor | null): Promise<ApiResult<CompareResponse>> {
-  const body = {
-    purpose,
-    documents: docs.map((d) => ({ doc_type: d.doc_type, fields: d.fields })),
-    ...(anchor && Object.values(anchor).some(Boolean) ? { anchor } : {}),
+  return {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
   };
-  return requestWithRetry<CompareResponse>("/v1/compare", postJson(body), validCompare);
 }
 
-export interface Stats {
-  checks: number;
-  checks_with_mismatch: number;
+export function compareDocuments(
+  prepared: PreparedComparison,
+): Promise<ApiResult<BackendCompareResponse>> {
+  return requestJson(
+    '/v1/compare',
+    postJson({ purpose: prepared.purpose, documents: prepared.documents }),
+    isCompareResponse,
+  );
 }
 
-export function stats(): Promise<ApiResult<Stats>> {
-  return requestWithRetry<Stats>("/v1/stats", { method: "GET" }, (b) => isObj(b) && typeof b.checks === "number");
+export function extractDocument(
+  docType: BackendDocType,
+  lines: RecognizedLine[],
+): Promise<ApiResult<ExtractResponse>> {
+  const confidence = lines.map((line) => line.confidence);
+  return requestJson(
+    '/v1/extract',
+    postJson({
+      doc_type: docType,
+      ocr_lines: lines.map((line) => line.text),
+      ...(confidence.every((value) => value !== null)
+        ? { ocr_confidence: confidence.map((value) => Math.round((value ?? 0) * 100) / 100) }
+        : {}),
+    }),
+    isExtractResponse,
+    true,
+  );
+}
+
+export function fetchStats(): Promise<ApiResult<StatsResponse>> {
+  return requestJson(
+    '/v1/stats',
+    { method: 'GET' },
+    (body): body is StatsResponse =>
+      isObject(body) &&
+      typeof body.checks === 'number' &&
+      Number.isInteger(body.checks) &&
+      body.checks >= 0 &&
+      typeof body.checks_with_mismatch === 'number' &&
+      Number.isInteger(body.checks_with_mismatch) &&
+      body.checks_with_mismatch >= 0,
+  );
 }

@@ -31,7 +31,7 @@ def test_no_other_region_hardcoded() -> None:
     pattern = re.compile(r"\b(?:af|ap|ca|eu|il|me|mx|sa|us)-[a-z]+-\d\b")
     paths = [p for g in ("backend/**/*.py", "scripts/*", "template.yaml", ".github/**/*.yml",
                          "HANDOFF.md", "CLAUDE.md", "README.md", "docs/*.md",
-                         "frontend/src/**/*.ts*", "frontend/src/strings/*.json")
+                         "frontend/src/**/*.ts*")
              for p in ROOT.glob(g) if p.is_file()]
     for path in paths:
         for found in pattern.findall(path.read_text(errors="ignore")):

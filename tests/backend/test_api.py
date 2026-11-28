@@ -98,11 +98,83 @@ def test_compare_contract_and_stats(fakes, call) -> None:
     counters = fakes
     status, body = call("POST", "/v1/compare", COMPARE_BODY)
     assert status == 200
-    assert set(body) == {"summary", "findings", "fix_plan", "disclaimer"}
+    assert set(body) == {"summary", "findings", "fix_plan", "guidance", "disclaimer"}
     assert body["summary"]["status"] == "mismatches_found"
     assert body["summary"]["counts"] == {"blocking": 2, "risky": 0, "cosmetic": 0}
+    assert [item["code"] for item in body["guidance"]] == [
+        "NAME_INITIALS_VS_EXPANDED",
+        "DOB_OFF_BY_SMALL",
+    ]
+    assert [item["finding_index"] for item in body["guidance"]] == [0, 1]
+    assert "RAVI" not in json.dumps(body["guidance"])
     assert counters.checks == [True]
     assert call("GET", "/v1/stats") == (200, {"checks": 1, "checks_with_mismatch": 1})
+
+
+def test_compare_validates_guidance_for_duplicate_document_types(fakes, call) -> None:
+    body = {
+        "purpose": "general",
+        "documents": [
+            {"doc_type": "other", "fields": {"name": "ARJUN MEHRA"}},
+            {"doc_type": "other", "fields": {"name": "ARJUN K MEHRA"}},
+        ],
+    }
+    status, response = call("POST", "/v1/compare", body)
+    assert status == 200
+    assert len(response["guidance"]) == 1
+
+
+def test_compare_all_match_returns_empty_guidance(fakes, call) -> None:
+    body = {
+        "purpose": "general",
+        "documents": [
+            {"doc_type": "aadhaar", "fields": {"name": "RAVI KUMAR", "dob": "2007-03-14"}},
+            {"doc_type": "pan", "fields": {"name": "RAVI KUMAR", "dob": "2007-03-14"}},
+        ],
+    }
+    status, response = call("POST", "/v1/compare", body)
+    assert status == 200
+    assert response["findings"] == []
+    assert response["guidance"] == []
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda guidance: guidance[0].update(priority="critical"),
+        lambda guidance: guidance[0].update(code="DOB_OFF_BY_SMALL"),
+        lambda guidance: guidance[0]["official_references"][0].update(url="http://example.test"),
+        lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-99-99"),
+        lambda guidance: guidance[0]["official_references"][0].update(verified_on="2026-11-26"),
+        lambda guidance: guidance[0]["official_references"][0].update(
+            status="needs_verification"
+        ),
+        lambda guidance: guidance[0].update(unexpected="value"),
+    ],
+)
+def test_compare_rejects_invalid_guidance_with_safe_error(
+    fakes, call, monkeypatch, mutate
+) -> None:
+    from backend import app as app_module
+
+    _, valid = call("POST", "/v1/compare", COMPARE_BODY)
+    invalid = valid
+    mutate(invalid["guidance"])
+    monkeypatch.setattr(app_module.engine, "compare", lambda *a, **k: invalid)
+
+    status, error = call("POST", "/v1/compare", COMPARE_BODY)
+    _assert_error((status, error), 500, "internal_error")
+    assert "RAVI" not in json.dumps(error)
+
+
+def test_compare_requires_guidance_for_every_finding(fakes, call, monkeypatch) -> None:
+    from backend import app as app_module
+
+    _, valid = call("POST", "/v1/compare", COMPARE_BODY)
+    valid["guidance"] = valid["guidance"][:1]
+    monkeypatch.setattr(app_module.engine, "compare", lambda *a, **k: valid)
+
+    _assert_error(call("POST", "/v1/compare", COMPARE_BODY), 500, "internal_error")
 
 
 def test_compare_never_capped(fakes, call) -> None:
