@@ -14,12 +14,12 @@ export function illustration(name: string): string {
 }
 
 export const CARTOONS = {
-  confusedCitizen: illustration("cartoon_confused_citizen_1795762591101"),
-  officeQueue: illustration("cartoon_office_queue_1795762591695"),
-  overworkedClerk: illustration("cartoon_overworked_clerk_1795762592596"),
-  documentDetective: illustration("cartoon_document_detective_1795762593345"),
-  paperworkMonster: illustration("cartoon_paperwork_monster_1795762594026"),
-  organisedCitizen: illustration("cartoon_organised_citizen_1795762593639"),
+  confusedCitizen: illustration("cartoon_confused_citizen"),
+  officeQueue: illustration("cartoon_office_queue"),
+  overworkedClerk: illustration("cartoon_overworked_clerk"),
+  documentDetective: illustration("cartoon_document_detective"),
+  paperworkMonster: illustration("cartoon_paperwork_monster"),
+  organisedCitizen: illustration("cartoon_organised_citizen"),
 } as const;
 
 /** Media query at or above which the illustrated border is rendered at all. */

@@ -62,7 +62,7 @@ export const DEMO_PRESETS: DemoPreset[] = [
           { id: 'ka2', text: 'Year of Birth: 1994', selected: true, mappedField: 'dob' },
           { id: 'ka3', text: 'D/O Suresh Menon Nair', selected: true, mappedField: 'parentName' },
           { id: 'ka4', text: 'FEMALE', selected: true, mappedField: 'gender' },
-          { id: 'ka5', text: 'Aadhaar No: 4821 9014 7721 (redacted on send)', selected: false },
+          { id: 'ka5', text: 'Aadhaar No: XXXX XXXX 7721 (redacted on send)', selected: false },
         ],
       },
       {
