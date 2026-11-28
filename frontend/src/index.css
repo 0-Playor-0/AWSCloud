@@ -141,11 +141,36 @@
   }
 }
 
+.print-only {
+  display: none;
+}
+
+/* "Download report": the browser's print-to-PDF of the report alone. No photos, no network call. */
 @media print {
-  .no-print {
+  .no-print,
+  main > :not(#report) {
     display: none !important;
   }
-  body {
+  .print-only {
+    display: block !important;
+  }
+  body,
+  .newsprint-bg {
     background: #ffffff !important;
+  }
+  /* Scroll-triggered reveals may not have run for off-screen parts: print everything visible. */
+  #report,
+  #report * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  #report details > *:not(summary) {
+    display: block !important;
+  }
+  #report {
+    padding-top: 0 !important;
+    border: 0 !important;
   }
 }

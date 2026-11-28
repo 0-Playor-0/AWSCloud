@@ -83,6 +83,8 @@ export interface ComparisonReport {
   guidance?: BackendGuidance[];
   fixPlan?: BackendFixStep[];
   disclaimer?: string;
+  /** Backend finding counts; only backend results have them (they drive the Health Score). */
+  severityCounts?: { blocking: number; risky: number; cosmetic: number };
 }
 
 export interface DemoPreset {

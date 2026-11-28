@@ -233,7 +233,9 @@ export default function App() {
             <p className="font-mono text-[11px] tracking-[0.1em] text-[#c8322b] uppercase font-semibold">
               {soFarCopy.kicker}
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-6">
+            {/* Hidden until at least one check has run: "0 checks run" reads as broken. */}
+            {Math.max(backendStats?.checks ?? 0, checksRun) > 0 && (
+            <div data-testid="counter" className="mt-4 grid grid-cols-2 gap-6">
               <div>
                 <div className="font-sans text-3xl font-extrabold text-[#14213d] tabular-nums">
                   {Math.max(backendStats?.checks ?? 0, checksRun)}
@@ -251,6 +253,7 @@ export default function App() {
                 </div>
               </div>
             </div>
+            )}
             <p className="mt-4 font-mono text-xs text-[#14213d]/75 underline decoration-[#14213d]/40">
               {soFarCopy.publicCode}
             </p>

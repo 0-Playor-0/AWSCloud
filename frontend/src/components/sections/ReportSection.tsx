@@ -8,6 +8,7 @@ import {
   SectionId,
 } from '../../types/documents';
 import { UI_COPY } from '../../utils/i18n';
+import { HealthScore } from '../HealthScore';
 
 interface ReportSectionProps {
   language: AppLanguage;
@@ -148,8 +149,10 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
             </motion.div>
           </div>
 
-          {/* Summary Count Strip (Tabular Numerals) */}
-          <div className="grid grid-cols-3 gap-2 border-b border-[#14213d]/15 py-4 text-center">
+          {/* Identity Health Score beside the summary count strip */}
+          <div className="flex flex-wrap items-center gap-4 border-b border-[#14213d]/15 py-4">
+          <HealthScore counts={report.severityCounts} />
+          <div className="grid min-w-[14rem] flex-1 grid-cols-3 gap-2 text-center">
             <div>
               <div className="font-mono text-xl font-bold text-[#1f7a4d] tabular-nums">
                 {report.matchCount}
@@ -174,6 +177,7 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
                 Mismatches
               </div>
             </div>
+          </div>
           </div>
 
           {/* Priority Guidance Box */}
@@ -396,6 +400,10 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
               before text comparison on AWS (Sydney, Australia) without storage.
             </p>
 
+            <p className="print-only mt-3 font-mono text-[11px] text-[#14213d]/80">
+              Namma Check · {window.location.origin} · printed {report.generatedAtLabel}
+            </p>
+
             <div className="no-print mt-4 flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
@@ -413,6 +421,7 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
               >
                 <Printer className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{t.printReport}</span>
+                <span className="sr-only"> (download as PDF from the print dialog)</span>
               </button>
             </div>
           </div>

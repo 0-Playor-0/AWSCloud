@@ -145,7 +145,7 @@ export const UI_COPY: Record<AppLanguage, UiDictionary> = {
       recommendedFirst: 'Recommended First Review',
       fieldBreakdown: 'Field-by-Field Breakdown',
       editDocs: 'Edit documents',
-      printReport: 'Print / Save summary',
+      printReport: 'Download report (PDF)',
     },
     soFar: {
       kicker: '05 // So far',

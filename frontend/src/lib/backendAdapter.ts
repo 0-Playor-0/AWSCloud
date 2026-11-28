@@ -265,6 +265,7 @@ export function toComparisonReport(
     guidance: response.guidance,
     fixPlan: response.fix_plan,
     disclaimer: response.disclaimer,
+    severityCounts: response.summary.counts,
   };
 }
 
