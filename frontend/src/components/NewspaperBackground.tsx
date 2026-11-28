@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useSyncExternalStore, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { SectionId } from '../types/documents';
-import { CARTOON_ASSETS } from './illustrations/EditorialCartoonFrame';
+import { BORDER_MIN_WIDTH, CARTOONS, illustration } from '../lib/illustrations';
 
 interface NewspaperBackgroundProps {
   activeSection: SectionId;
@@ -29,7 +29,7 @@ const cell = (
 ): StripItem => ({
   kind: 'cell',
   id,
-  src: `/src/assets/images/cells/${prefix}_${index}.png`,
+  src: illustration(`cells/${prefix}_${index}`),
   focusSections,
 });
 
@@ -46,7 +46,7 @@ const scene = (
  * pack tightly without wasted transparent boxes and never overlap.
  */
 const OUTER_LEFT_ITEMS: StripItem[] = [
-  scene('s-confused', CARTOON_ASSETS.confusedCitizen.src, ['hero']),
+  scene('s-confused', CARTOONS.confusedCitizen, ['hero']),
   cell('ol-01', 'citizensA', 0, ['hero']),
   cell('ol-02', 'humorous', 0, ['hero', 'problem']),
   cell('ol-03', 'equipment', 3, ['hero']),
@@ -59,7 +59,7 @@ const OUTER_LEFT_ITEMS: StripItem[] = [
   cell('ol-10', 'moreCitizens', 4, ['problem']),
   cell('ol-11', 'expressions', 4, ['problem']),
   cell('ol-12', 'objects', 2, ['problem', 'how-it-works']),
-  scene('s-clerk', CARTOON_ASSETS.overworkedClerk.src, ['how-it-works']),
+  scene('s-clerk', CARTOONS.overworkedClerk, ['how-it-works']),
   cell('ol-13', 'antics', 4, ['how-it-works']),
   cell('ol-14', 'crowds', 3, ['how-it-works']),
   cell('ol-15', 'humorous', 6, ['how-it-works']),
@@ -71,7 +71,7 @@ const OUTER_LEFT_ITEMS: StripItem[] = [
   cell('ol-21', 'moreCitizens', 3, ['workspace']),
   cell('ol-22', 'workers', 1, ['workspace']),
   cell('ol-23', 'expressions', 5, ['workspace', 'report']),
-  scene('s-organised', CARTOON_ASSETS.organisedCitizen.src, ['report']),
+  scene('s-organised', CARTOONS.organisedCitizen, ['report']),
   cell('ol-24', 'propsA', 6, ['workspace', 'report']),
   cell('ol-25', 'antics', 7, ['report']),
   cell('ol-26', 'bureaucracy', 2, ['report']),
@@ -93,111 +93,15 @@ const OUTER_LEFT_ITEMS: StripItem[] = [
   cell('ol-42', 'propsB', 1, ['report']),
 ];
 
-const INNER_LEFT_ITEMS: StripItem[] = [
-  cell('il-01', 'objects', 0, ['hero']),
-  cell('il-02', 'humorous', 2, ['hero']),
-  cell('il-03', 'moreCitizens', 1, ['hero']),
-  cell('il-04', 'aliveDocs', 0, ['hero']),
-  cell('il-05', 'expressions', 1, ['hero']),
-  cell('il-06', 'propsA', 0, ['hero', 'problem']),
-  cell('il-07', 'expressions', 6, ['hero', 'problem']),
-  cell('il-08', 'aliveDocs', 1, ['problem']),
-  cell('il-09', 'bureaucracy', 7, ['problem']),
-  cell('il-10', 'vignettes', 4, ['problem']),
-  cell('il-11', 'portraits', 0, ['problem']),
-  cell('il-12', 'humorous', 5, ['problem']),
-  cell('il-13', 'propsB', 8, ['problem', 'how-it-works']),
-  cell('il-14', 'propsB', 6, ['problem']),
-  cell('il-15', 'humorous', 3, ['problem', 'how-it-works']),
-  cell('il-16', 'bureaucracy', 1, ['how-it-works']),
-  cell('il-17', 'vignettes', 3, ['how-it-works']),
-  cell('il-18', 'aliveDocs', 4, ['how-it-works']),
-  cell('il-19', 'vignettes', 5, ['how-it-works']),
-  cell('il-20', 'antics', 0, ['how-it-works', 'workspace']),
-  cell('il-21', 'propsA', 3, ['how-it-works', 'workspace']),
-  cell('il-22', 'stationery', 2, ['workspace']),
-  cell('il-23', 'propsB', 0, ['workspace']),
-  cell('il-24', 'propsA', 4, ['workspace']),
-  cell('il-25', 'antics', 3, ['workspace']),
-  cell('il-26', 'stationery', 7, ['workspace']),
-  cell('il-27', 'propsA', 5, ['workspace']),
-  cell('il-28', 'antics', 8, ['report']),
-  cell('il-29', 'propsB', 5, ['report']),
-  cell('il-30', 'stationery', 0, ['report']),
-  cell('il-31', 'aliveDocs', 6, ['report']),
-  cell('il-32', 'bureaucracy', 3, ['report']),
-  cell('il-33', 'moreCitizens', 2, ['report']),
-  cell('il-34', 'equipment', 2, ['report']),
-  cell('il-35', 'portraits', 7, ['report']),
-  cell('il-36', 'crowds', 5, ['report']),
-  cell('il-37', 'citizensA', 3, ['report']),
-  cell('il-38', 'workers', 0, ['report']),
-  cell('il-39', 'expressions', 2, ['report']),
-  cell('il-40', 'stationery', 4, ['report']),
-  cell('il-41', 'vignettes', 1, ['report']),
-  cell('il-42', 'humorous', 7, ['report']),
-  cell('il-43', 'propsA', 2, ['report']),
-  cell('il-44', 'bureaucracy', 8, ['report']),
-  cell('il-45', 'portraits', 3, ['report']),
-  cell('il-46', 'crowds', 1, ['report']),
-];
 
-const INNER_RIGHT_ITEMS: StripItem[] = [
-  cell('ir-01', 'propsA', 1, ['hero']),
-  cell('ir-02', 'stationery', 6, ['hero']),
-  cell('ir-03', 'aliveDocs', 3, ['hero', 'problem']),
-  cell('ir-04', 'moreCitizens', 8, ['hero', 'problem']),
-  cell('ir-05', 'propsB', 1, ['hero', 'problem']),
-  cell('ir-06', 'propsA', 2, ['hero', 'problem']),
-  cell('ir-07', 'moreCitizens', 6, ['problem']),
-  cell('ir-08', 'portraits', 3, ['problem']),
-  cell('ir-09', 'expressions', 0, ['problem']),
-  cell('ir-10', 'stationery', 1, ['problem']),
-  cell('ir-11', 'moreCitizens', 0, ['problem']),
-  cell('ir-12', 'propsA', 8, ['problem']),
-  cell('ir-13', 'portraits', 1, ['problem', 'how-it-works']),
-  cell('ir-14', 'antics', 5, ['how-it-works']),
-  cell('ir-15', 'stationery', 8, ['how-it-works']),
-  cell('ir-16', 'humorous', 7, ['how-it-works']),
-  cell('ir-17', 'aliveDocs', 2, ['how-it-works']),
-  cell('ir-18', 'antics', 1, ['workspace']),
-  cell('ir-19', 'bureaucracy', 6, ['workspace']),
-  cell('ir-20', 'antics', 2, ['workspace']),
-  cell('ir-21', 'stationery', 4, ['workspace']),
-  cell('ir-22', 'expressions', 3, ['workspace']),
-  cell('ir-23', 'portraits', 4, ['workspace']),
-  cell('ir-24', 'bureaucracy', 4, ['workspace']),
-  cell('ir-25', 'objects', 1, ['workspace', 'report']),
-  cell('ir-26', 'portraits', 8, ['workspace', 'report']),
-  cell('ir-27', 'moreCitizens', 2, ['report']),
-  cell('ir-28', 'expressions', 7, ['report']),
-  cell('ir-29', 'portraits', 7, ['report']),
-  cell('ir-30', 'aliveDocs', 8, ['report']),
-  cell('ir-31', 'vignettes', 7, ['report']),
-  cell('ir-32', 'objects', 2, ['report']),
-  cell('ir-33', 'workers', 1, ['report']),
-  cell('ir-34', 'crowds', 0, ['report']),
-  cell('ir-35', 'propsA', 7, ['report']),
-  cell('ir-36', 'humorous', 4, ['report']),
-  cell('ir-37', 'equipment', 1, ['report']),
-  cell('ir-38', 'vignettes', 2, ['report']),
-  cell('ir-39', 'expressions', 8, ['report']),
-  cell('ir-40', 'antics', 6, ['report']),
-  cell('ir-41', 'propsB', 3, ['report']),
-  cell('ir-42', 'crowds', 7, ['report']),
-  cell('ir-43', 'stationery', 3, ['report']),
-  cell('ir-44', 'moreCitizens', 5, ['report']),
-  cell('ir-45', 'portraits', 5, ['report']),
-  cell('ir-46', 'bureaucracy', 0, ['report']),
-];
 
 const OUTER_RIGHT_ITEMS: StripItem[] = [
-  scene('s-queue', CARTOON_ASSETS.officeQueue.src, ['hero', 'problem']),
+  scene('s-queue', CARTOONS.officeQueue, ['hero', 'problem']),
   cell('or-01', 'aliveDocs', 7, ['hero']),
   cell('or-02', 'humorous', 8, ['hero']),
   cell('or-03', 'equipment', 1, ['hero', 'problem']),
   cell('or-04', 'humorous', 1, ['problem']),
-  scene('s-detective', CARTOON_ASSETS.documentDetective.src, ['problem']),
+  scene('s-detective', CARTOONS.documentDetective, ['problem']),
   cell('or-05', 'bureaucracy', 0, ['problem']),
   cell('or-06', 'propsB', 3, ['problem']),
   cell('or-07', 'crowds', 2, ['problem']),
@@ -211,7 +115,7 @@ const OUTER_RIGHT_ITEMS: StripItem[] = [
   cell('or-15', 'expressions', 2, ['how-it-works']),
   cell('or-16', 'crowds', 1, ['how-it-works', 'workspace']),
   cell('or-17', 'workers', 0, ['how-it-works', 'workspace']),
-  scene('s-monster', CARTOON_ASSETS.paperworkMonster.src, ['how-it-works', 'workspace']),
+  scene('s-monster', CARTOONS.paperworkMonster, ['how-it-works', 'workspace']),
   cell('or-18', 'stationery', 3, ['workspace']),
   cell('or-19', 'humorous', 4, ['workspace']),
   cell('or-20', 'crowds', 5, ['workspace']),
@@ -240,26 +144,26 @@ const OUTER_RIGHT_ITEMS: StripItem[] = [
 ];
 
 const EDGE_PEEKER_SRCS = [
-  '/src/assets/images/cells/aliveDocs_0.png',
-  '/src/assets/images/cells/stationery_2.png',
-  '/src/assets/images/cells/portraits_1.png',
-  '/src/assets/images/cells/antics_4.png',
-  '/src/assets/images/cells/propsA_0.png',
-  '/src/assets/images/cells/aliveDocs_3.png',
-  '/src/assets/images/cells/humorous_2.png',
-  '/src/assets/images/cells/stationery_7.png',
-  '/src/assets/images/cells/portraits_4.png',
-  '/src/assets/images/cells/propsB_4.png',
-  '/src/assets/images/cells/aliveDocs_6.png',
-  '/src/assets/images/cells/antics_1.png',
-  '/src/assets/images/cells/expressions_0.png',
-  '/src/assets/images/cells/stationery_0.png',
-  '/src/assets/images/cells/portraits_6.png',
-  '/src/assets/images/cells/propsA_3.png',
-  '/src/assets/images/cells/aliveDocs_8.png',
-  '/src/assets/images/cells/antics_6.png',
-  '/src/assets/images/cells/stationery_4.png',
-  '/src/assets/images/cells/portraits_2.png',
+  illustration('cells/aliveDocs_0'),
+  illustration('cells/stationery_2'),
+  illustration('cells/portraits_1'),
+  illustration('cells/antics_4'),
+  illustration('cells/propsA_0'),
+  illustration('cells/aliveDocs_3'),
+  illustration('cells/humorous_2'),
+  illustration('cells/stationery_7'),
+  illustration('cells/portraits_4'),
+  illustration('cells/propsB_4'),
+  illustration('cells/aliveDocs_6'),
+  illustration('cells/antics_1'),
+  illustration('cells/expressions_0'),
+  illustration('cells/stationery_0'),
+  illustration('cells/portraits_6'),
+  illustration('cells/propsA_3'),
+  illustration('cells/aliveDocs_8'),
+  illustration('cells/antics_6'),
+  illustration('cells/stationery_4'),
+  illustration('cells/portraits_2'),
 ];
 
 const EdgePeekerTile: React.FC<{
@@ -336,7 +240,9 @@ const EdgePeekerTile: React.FC<{
             <img
               src={src}
               alt=""
-              referrerPolicy="no-referrer"
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
               onError={() => setFailed(true)}
               className={`w-full h-auto block cartoon-blend ${
                 isHovered ? 'cartoon-blend-hovered' : ''
@@ -456,7 +362,9 @@ const StripCartoonTile: React.FC<{
           <img
             src={item.src}
             alt=""
-            referrerPolicy="no-referrer"
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             onError={() => setFailed(true)}
             className={`w-full h-auto block cartoon-blend ${
               isHovered ? 'cartoon-blend-hovered' : ''
@@ -501,15 +409,33 @@ const VerticalCartoonColumn: React.FC<{
   </div>
 );
 
+function subscribeBorderQuery(onChange: () => void): () => void {
+  const query = window.matchMedia(BORDER_MIN_WIDTH);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+/** True at >= 1024 px. Below that the border is not rendered, so no image is ever requested. */
+function useWideEnoughForBorder(): boolean {
+  return useSyncExternalStore(
+    subscribeBorderQuery,
+    () => window.matchMedia(BORDER_MIN_WIDTH).matches,
+    () => false,
+  );
+}
+
 export const NewspaperBackground: React.FC<NewspaperBackgroundProps> = ({
   activeSection,
 }) => {
   const prefersReducedMotion = useReducedMotion();
+  const wide = useWideEnoughForBorder();
+  if (!wide) return null;
 
   return (
     <div
       aria-hidden="true"
-      className="no-print pointer-events-none select-none absolute inset-0 overflow-hidden z-0"
+      data-testid="illustrated-border"
+      className="no-print hidden lg:block pointer-events-none select-none absolute inset-0 overflow-hidden z-0"
     >
       {/* Subtle horizontal broadsheet fold rules across the full parchment canvas */}
       <div className="absolute inset-0 w-full">
@@ -531,22 +457,10 @@ export const NewspaperBackground: React.FC<NewspaperBackgroundProps> = ({
           edgeSide="left"
           className="flex-1 min-w-0 border-r border-[#14213d]/[0.07]"
         />
-        <VerticalCartoonColumn
-          items={INNER_LEFT_ITEMS}
-          activeSection={activeSection}
-          prefersReducedMotion={prefersReducedMotion}
-          className="hidden flex-1 min-w-0 border-r border-[#14213d]/[0.07]"
-        />
       </div>
 
       {/* RIGHT SIDE: Continuous non-overlapping vertical cartoon strip sheets */}
       <div className="editorial-strip-right absolute top-0 bottom-0 w-[145px] sm:w-[185px] lg:w-[220px] flex flex-row items-stretch overflow-hidden opacity-70">
-        <VerticalCartoonColumn
-          items={INNER_RIGHT_ITEMS}
-          activeSection={activeSection}
-          prefersReducedMotion={prefersReducedMotion}
-          className="hidden flex-1 min-w-0 border-l border-[#14213d]/[0.07]"
-        />
         <VerticalCartoonColumn
           items={OUTER_RIGHT_ITEMS}
           activeSection={activeSection}

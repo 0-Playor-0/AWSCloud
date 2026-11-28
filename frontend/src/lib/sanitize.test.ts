@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 
 import { MAX_LINE_CHARS, MAX_LINES, sanitizeLines } from './sanitize';
 

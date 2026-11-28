@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'vitest';
 
 import { DEMO_PRESETS } from '../utils/comparisonEngine';
 import { prepareComparison, toComparisonReport } from './backendAdapter';
@@ -20,7 +20,6 @@ test('maps the newspaper document model to the backend contract', () => {
 });
 
 test('maps the backend response and guidance into the report model', () => {
-  const prepared = prepareComparison(preset.purpose, preset.documents);
   const response: BackendCompareResponse = {
     summary: {
       status: 'mismatches_found',
