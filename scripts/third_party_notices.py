@@ -87,6 +87,9 @@ def main() -> None:
         " (Tesseract OCR compiled to WebAssembly) | Apache-2.0 |",
         "| Fonts (`assets/*.woff2`) | Anton; Playfair Display; IBM Plex Sans; IBM Plex Mono (via"
         " Fontsource) | SIL Open Font License 1.1 |",
+        "| Illustrations (`assets/*.webp`, newspaper border; sources in"
+        " `frontend/src/assets/images/`) | Illustrations: [SOURCE PENDING — ask Hiral] |"
+        " [SOURCE PENDING — ask Hiral] |",
         "",
         "## Website (browser)",
         "",

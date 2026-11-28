@@ -16,6 +16,7 @@ do not edit by hand.
 | `ocr/<versions>/lang/eng.traineddata.gz` (English OCR model, 4.0.0 best_int) | Tesseract OCR tessdata_best (https://github.com/tesseract-ocr/tessdata_best), packaged by `@tesseract.js-data/eng` | Apache-2.0 (model data); packaging MIT |
 | `ocr/<versions>/worker.min.js`, `core/*.wasm.js` | Tesseract.js, tesseract.js-core (Tesseract OCR compiled to WebAssembly) | Apache-2.0 |
 | Fonts (`assets/*.woff2`) | Anton; Playfair Display; IBM Plex Sans; IBM Plex Mono (via Fontsource) | SIL Open Font License 1.1 |
+| Illustrations (`assets/*.webp`, newspaper border; sources in `frontend/src/assets/images/`) | Illustrations: [SOURCE PENDING — ask Hiral] | [SOURCE PENDING — ask Hiral] |
 
 ## Website (browser)
 
@@ -27,13 +28,13 @@ do not edit by hand.
 | @fontsource/playfair-display | 5.3.0 | OFL-1.1 |
 | @tesseract.js-data/eng | 1.0.0 | MIT |
 | bmp-js | 0.1.0 | MIT |
-| framer-motion | 12.43.0 | MIT |
+| framer-motion | 14.14.0 | MIT |
 | idb-keyval | 6.3.0 | Apache-2.0 |
 | is-url | 1.2.4 | MIT |
 | lucide-react | 0.546.0 | ISC |
-| motion | 12.43.0 | MIT |
-| motion-dom | 12.43.0 | MIT |
-| motion-utils | 12.39.0 | MIT |
+| motion | 14.14.0 | MIT |
+| motion-dom | 14.14.0 | MIT |
+| motion-utils | 14.7.0 | MIT |
 | node-fetch | 2.7.0 | MIT |
 | opencollective-postinstall | 2.0.3 | MIT |
 | react | 19.3.1 | MIT |
@@ -490,7 +491,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### framer-motion 12.43.0
+### framer-motion 14.14.0
 
 ```
 The MIT License (MIT)
@@ -602,7 +603,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### motion 12.43.0, motion-dom 12.43.0, motion-utils 12.39.0
+### motion 14.14.0, motion-dom 14.14.0, motion-utils 14.7.0
 
 ```
 The MIT License (MIT)
