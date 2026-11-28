@@ -111,7 +111,7 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
           {/* Receipt Masthead & Animated Rubber Stamp */}
           <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-dashed border-[#14213d]/25 pb-5">
             <div>
-              <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#14213d]/60">
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[#14213d]/70">
                 {t.slipTitle}
               </div>
               <h3 className="mt-1 font-sans text-xl font-extrabold text-[#14213d]">
@@ -197,7 +197,7 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
                   key={i}
                   className="flex items-start gap-2 text-[13px] leading-snug text-[#14213d]/85"
                 >
-                  <span className="font-mono text-[11px] font-semibold text-[#14213d]/55 mt-0.5 tabular-nums">
+                  <span className="font-mono text-[11px] font-semibold text-[#14213d]/70 mt-0.5 tabular-nums">
                     0{i + 1}.
                   </span>
                   <span>{step}</span>
@@ -249,7 +249,7 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
                     </ol>
                     {item.official_references.length > 0 && (
                       <div className="mt-3 border-t border-[#14213d]/10 pt-2.5">
-                        <div className="font-mono text-[9.5px] uppercase tracking-wider text-[#14213d]/55">
+                        <div className="font-mono text-[9.5px] uppercase tracking-wider text-[#14213d]/70">
                           Official references
                         </div>
                         <ul className="mt-1.5 space-y-1">
@@ -263,13 +263,13 @@ export const ReportSection: React.FC<ReportSectionProps> = ({
                               >
                                 {reference.label}
                               </a>
-                              <span className="text-[#14213d]/55"> · {reference.authority}</span>
+                              <span className="text-[#14213d]/70"> · {reference.authority}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
-                    <p className="mt-3 font-mono text-[9.5px] leading-relaxed text-[#14213d]/50">
+                    <p className="mt-3 font-mono text-[9.5px] leading-relaxed text-[#14213d]/70">
                       {item.disclaimer}
                     </p>
                   </article>

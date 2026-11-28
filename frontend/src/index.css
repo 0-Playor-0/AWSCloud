@@ -141,6 +141,12 @@
   }
 }
 
+/* Skip style and layout of below-the-fold sections until they are near the viewport. */
+main > section:not(#hero) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
 .print-only {
   display: none;
 }
@@ -159,6 +165,9 @@
     background: #ffffff !important;
   }
   /* Scroll-triggered reveals may not have run for off-screen parts: print everything visible. */
+  main > section {
+    content-visibility: visible !important;
+  }
   #report,
   #report * {
     opacity: 1 !important;

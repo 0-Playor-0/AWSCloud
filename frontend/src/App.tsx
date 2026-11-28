@@ -272,7 +272,7 @@ export default function App() {
               ನಮ್ಮ ಚೆಕ್ · நம்ம செக் · నమ్మ చెక్ · നമ്മ ചെക്ക് · नम्मा चेक · নম্মা চেক
             </span>
           </div>
-          <p className="text-[11px] text-[#14213d]/60">
+          <p className="text-[11px] text-[#14213d]/70">
             {footerCopy.scriptNote}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-[11px] text-[#14213d]/65 font-mono">

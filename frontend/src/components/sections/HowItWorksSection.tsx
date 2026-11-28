@@ -73,7 +73,7 @@ export const HowItWorksSection: React.FC<HowItWorksSectionProps> = ({ language }
                 <span className="font-mono text-xs font-semibold text-[#c8322b] tabular-nums">
                   STEP {step.num}
                 </span>
-                <span className="font-mono text-[10px] text-[#14213d]/45 uppercase">
+                <span className="font-mono text-[10px] text-[#14213d]/70 uppercase">
                   {step.tag}
                 </span>
               </div>

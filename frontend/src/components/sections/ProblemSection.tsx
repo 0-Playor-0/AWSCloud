@@ -83,14 +83,14 @@ export const ProblemSection: React.FC<ProblemSectionProps> = ({ language }) => {
               <h3 className="font-sans text-base font-bold text-[#14213d]">
                 {item.title}
               </h3>
-              <span className="font-mono text-[10.5px] tracking-wider text-[#14213d]/55">
+              <span className="font-mono text-[10.5px] tracking-wider text-[#14213d]/70">
                 {item.code}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 font-mono text-xs">
               <div className="border border-[#14213d]/15 bg-[#f6f1e7] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-[#14213d]/55">
+                <div className="text-[10px] uppercase tracking-wider text-[#14213d]/70">
                   {item.docA.label}
                 </div>
                 <div className="mt-0.5 font-medium text-[#14213d]">{item.docA.value}</div>

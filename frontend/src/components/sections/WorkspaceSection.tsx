@@ -350,7 +350,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
           <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[#14213d]">
             {t.purposeLabel}
           </span>
-          <span className="font-mono text-[10.5px] text-[#14213d]/60">
+          <span className="font-mono text-[10.5px] text-[#14213d]/70">
             {t.purposeHint}
           </span>
         </div>
@@ -483,7 +483,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                       </option>
                     ))}
                   </select>
-                  <span className="font-mono text-[10px] tracking-wider text-[#14213d]/55 uppercase">
+                  <span className="font-mono text-[10px] tracking-wider text-[#14213d]/70 uppercase">
                     · DOC 0{idx + 1}
                   </span>
                   {doc.isSample && (
@@ -508,7 +508,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                       type="button"
                       onClick={() => handleRemoveDocument(doc.id)}
                       aria-label={`Remove ${doc.label}`}
-                      className="text-[#14213d]/45 hover:text-[#c8322b] cursor-pointer p-1"
+                      className="text-[#14213d]/70 hover:text-[#c8322b] cursor-pointer p-1"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
@@ -543,7 +543,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-start">
                     <div className="sm:col-span-2 border border-[#14213d]/20 bg-[#fbf8f2] p-2.5">
                       <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span className="font-mono text-[9.5px] text-[#14213d]/60 uppercase">
+                        <span className="font-mono text-[9.5px] text-[#14213d]/70 uppercase">
                           Local photo preview
                         </span>
                         <span className="font-mono text-[8.5px] uppercase text-[#1f7a4d]">
@@ -576,7 +576,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                               {doc.dob || 'DOB line'}
                             </div>
                           </div>
-                          <span className="font-mono text-[8.5px] text-[#14213d]/50">
+                          <span className="font-mono text-[8.5px] text-[#14213d]/70">
                             The photo stays in this browser.
                           </span>
                         </div>
@@ -643,7 +643,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                               className={`font-mono text-[11px] leading-snug ${
                                 line.selected
                                   ? 'text-[#14213d]'
-                                  : 'text-[#14213d]/45 line-through'
+                                  : 'text-[#14213d]/70 line-through'
                               }`}
                             >
                               {line.text}
@@ -651,7 +651,7 @@ export const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
                           </label>
                         ))}
                         {doc.ocrLines.length === 0 && (
-                          <p className="border border-dashed border-[#14213d]/20 bg-[#fbf8f2]/60 px-3 py-2 font-mono text-[10.5px] text-[#14213d]/60">
+                          <p className="border border-dashed border-[#14213d]/20 bg-[#fbf8f2]/60 px-3 py-2 font-mono text-[10.5px] text-[#14213d]/70">
                             Choose a photo to read its text on this device.
                           </p>
                         )}

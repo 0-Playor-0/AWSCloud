@@ -18,7 +18,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ language, onJumpTo }) 
     prefersReducedMotion
       ? { initial: { opacity: 1 }, animate: { opacity: 1 } }
       : {
-          initial: { opacity: 0, y: 12 },
+          // Slide only, no fade: the hero text is the LCP element and must paint immediately.
+          initial: { opacity: 1, y: 12 },
           animate: { opacity: 1, y: 0 },
           transition: { duration: 0.42, delay, ease: [0.16, 1, 0.3, 1] as const },
         };
