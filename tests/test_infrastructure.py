@@ -120,7 +120,7 @@ def test_existing_cost_and_concurrency_guards_remain() -> None:
     parameters = _TEMPLATE["Parameters"]
     assert parameters["ThrottleRate"]["Default"] == 10
     assert parameters["ThrottleBurst"]["Default"] == 20
-    assert parameters["ReservedConcurrency"]["Default"] == 10
+    assert parameters["ReservedConcurrency"]["Default"] == 20
 
     route_settings = _RESOURCES["HttpApi"]["Properties"]["DefaultRouteSettings"]
     assert route_settings["ThrottlingRateLimit"] == {"Ref": "ThrottleRate"}

@@ -8,6 +8,11 @@ how risky each difference is, and which document to fix first.
 
 It does not verify identity, does not contact any government system and is not legal advice.
 
+The report gives an **Identity Health Score** (100 − 25 per blocking − 10 per risky − 2 per cosmetic
+difference; our estimate, not an official score), per-difference guidance with links to the issuer,
+a character-level diff of what differs, and a **Download report (PDF)** button (the browser's print
+to PDF; nothing is uploaded). Screenshots: [logs/phase-6/](logs/phase-6/).
+
 ## How it works
 
 - **On your phone:** choose a photo; self-hosted Tesseract.js reads the text in the browser; long
@@ -103,7 +108,7 @@ Needs an AWS account, the AWS CLI and SAM CLI, and credentials for an IAM user (
    cd frontend && E2E_BASE_URL=<SiteUrl> E2E_API_URL=<ApiUrl> npm run e2e
    ```
 
-Cost is bounded by API throttling (10 requests/s, burst 20), Lambda reserved concurrency (10), CloudFront
+Cost is bounded by API throttling (10 requests/s, burst 20), Lambda reserved concurrency (20), CloudFront
 caching and the absence of any paid per-request AI service; budget alerts email you at $10, $25
 and $50.
 

@@ -19,10 +19,25 @@ AWS in Sydney and not stored.
 | Least privilege | Explicit Lambda execution role | Writes only to this function's log group and reads/writes only the counter table |
 | Cost guard | AWS Budgets | Email alerts at $10, $25, $50 actual spend |
 
+## Frontend (newspaper design, Phase 6b)
+
+- Built from PR #1 (Hiral) and hardened: exact dependency pins, oxlint + vitest + Playwright,
+  privacy e2e checks (no ID-like numbers in request bodies, no web-storage/IndexedDB writes, no
+  third-party hosts, consent before the first send).
+- **Identity Health Score** (client-side, from the backend's counts): 100 − 25 per blocking − 10 per
+  risky − 2 per cosmetic, floored at 0; Ready 90–100 / Needs fixes 60–89 / Likely rejected < 60.
+  Shown only for backend results; "Our estimate, not an official score."
+- **Download report**: a report-only print stylesheet and `window.print()`; the browser saves a PDF.
+  No PDF library, no network call, no photos.
+- Border illustrations: 130 PNGs (31.3 MB) → 90 WebP (1.87 MB), desktop only, lazy.
+- A client-side preview engine (`frontend/src/utils/comparisonEngine.ts`) renders a labelled
+  "Preview only" report for the sample before the user runs the real check; the backend engine
+  (`engine/`) is the source of truth for every result after that.
+
 ## Cost controls
 
 - API Gateway throttling: 10 requests/s, burst 20 (bare `429` beyond that).
-- Lambda reserved concurrency 10, 512 MB, 20 s timeout (extra load gets `503`). The site retries a
+- Lambda reserved concurrency 20, 512 MB, 20 s timeout (extra load gets `503`). The site retries a
   `503` or throttled `429` once after a short backoff before showing "try again".
 - No paid per-request AI service: OCR runs on the phone. The daily cap stays wired for a future
   metered extractor (Bedrock, off).

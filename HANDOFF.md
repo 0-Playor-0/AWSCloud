@@ -167,7 +167,7 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 ## 5. Reliability and cost control
 
 - API Gateway route throttling: 10 requests/s, burst 20 (tuned from 2/5 after Phase 5; report changes).
-- Lambda: reserved concurrency 10 (account limit 400), timeout 20 s, memory 512 MB (tune and report).
+- Lambda: reserved concurrency 20 (account limit 400; passed explicitly at deploy), timeout 20 s, memory 512 MB (tune and report).
 - Daily extraction cap in DynamoDB (`EXTRACT_DAILY_CAP`, default 300) applies only to the metered `bedrock` extractor; `client_ocr` makes no paid call and is bounded by throttling. When reached: `429 daily_cap_reached`; the frontend switches to typed mode automatically. `/v1/compare` is never capped beyond throttling (it costs almost nothing).
 - Input validation: content-type, base64 validity, JPEG magic bytes, decoded size, pixel dimensions, field lengths, date formats, 2–6 documents.
 - Frontend: one automatic retry after a short backoff (~0.8–1.2 s) on 503 or a throttled 429 before showing the message (daily_cap_reached is never retried); OCR assets (~7 MB) load only when photo mode is used, after a notice ("about 7 MB, one time") with download progress and a typed-mode alternative; they live under a versioned path `/ocr/<versions>/` and are served with a one-year immutable cache header; retry once on 502 for /v1/extract; clear messages for every error code; works on slow 4G.
@@ -187,15 +187,16 @@ Private entities are not permitted to collect or keep copies of Aadhaar cards un
 
 - **Stack:** React + Vite + TypeScript, Tailwind CSS, Motion for animation and Tesseract.js (lazy-loaded, self-hosted assets) for on-device OCR. At most two React Bits text effects. No GSAP.
 - **Reference:** vinhack.vinnovateit.com is effective because of numbered navigation, huge uppercase display type split across short lines, `//` separators, flip cards, a ticket-style pass, a multilingual wordmark and a casual first-person voice. Adapt, do not copy: no film/sticker motifs, no flip-card grid.
-- **Our concept: "the document desk".** Paper, ink and rubber stamps.
-  - Palette: paper `#F6F1E7`, ink navy `#14213D`, stamp red `#C8322B` (mismatch), green `#1F7A4D` (match), amber `#E9A23B` (risky). Check WCAG AA contrast and adjust shades if needed.
-  - Type: Bricolage Grotesque (display, uppercase, tight), IBM Plex Sans (body), IBM Plex Mono (field values, so letters align for comparison). Self-host fonts.
-  - Signature element: the same name shown on stacked document slips with the differing letters highlighted and a stamp ("MISMATCH" / "MATCH") landing on scroll. This is the hero and also how the report shows findings (character-level diff in mono type).
-  - Numbered sections `01 //` to `05 //`. Report styled as a tear-off receipt (our version of the pass). Footer wordmark "Namma Check" in several Indian scripts (flag translations for human review).
+- **Design system: newspaper broadsheet** (adopted from PR #1, 2026-11-28; replaces "the document desk").
+  - Palette: newsprint `#F6F1E7`/`#FCFAF5`, ink navy `#14213D`, masthead black `#0E1014`, stamp red `#C8322B` (mismatch), green `#1F7A4D` (match), amber `#E9A23B` (variation). Small text at ≥ 70 % ink opacity for WCAG AA.
+  - Type: Anton (headlines, uppercase), Playfair Display (masthead), IBM Plex Sans (body), IBM Plex Mono (field values and data). Self-hosted via Fontsource.
+  - Elements: sticky black masthead with section links; receipt-style report slip with a rubber stamp (RECORDS ALIGNED / MINOR VARIATIONS / DISCREPANCY FOUND); Identity Health Score ring beside the Matched / Variations / Mismatches tally ("Our estimate, not an official score"); character-level diff of flagged values in mono; "Download report (PDF)" = report-only print stylesheet + `window.print()`.
+  - Illustrated border: ink cartoons in two side strips, desktop only (≥ 1024 px; nothing rendered or requested below), WebP, lazy, decorative (`alt=""`, `aria-hidden`), bundled by Vite. Source/licence of the art: pending (see THIRD_PARTY_NOTICES.md).
+  - Footer wordmark "Namma Check" in several Indian scripts (flag translations for human review).
 - **Narrative arc (single page, then the tool):** 01 one person, five spellings → 02 what it costs (rejected claim, missed deadline; use only sourced numbers from `docs/facts.md`) → 03 how the check works in three steps, with the privacy promise → 04 try it (sample or your own) → 05 live counter from `/v1/stats` and repo link.
 - **Voice:** plain, second person, short sentences. No hype words.
-- **Motion:** scroll-triggered reveals and the stamp only; all disabled under `prefers-reduced-motion`.
-- **Budgets:** Lighthouse mobile performance >= 90, accessibility >= 95; initial JS <= 200 KB gzipped; LCP < 2.5 s on throttled 4G; full keyboard operation; visible focus; all states announced to screen readers; touch targets >= 44 px.
+- **Motion:** scroll-triggered reveals, the stamp and the border cartoons' idle sway; all reduced under `prefers-reduced-motion`. Hero text slides without fading (it is the LCP element).
+- **Budgets:** Lighthouse mobile >= 95 in every category (Phase 6b); illustrations <= 2.5 MB total; initial JS <= 200 KB gzipped; LCP < 2.5 s on throttled 4G; full keyboard operation; visible focus; all states announced to screen readers; touch targets >= 44 px.
 - **i18n:** UI copy lives in `src/utils/i18n.ts`; English, Hindi and Marathi are available.
 
 ## 8. What the human does (not you)
