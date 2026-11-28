@@ -70,3 +70,22 @@ test('maps the backend response and guidance into the report model', () => {
   assert.equal(report.fixPlan?.[0].step, 1);
   assert.equal(report.fields.find((field) => field.field === 'fullName')?.severity, 'mismatch');
 });
+
+test('marks character differences of flagged values against the first document', () => {
+  const docs = structuredClone(preset.documents).slice(0, 2);
+  docs[0].fullName = 'ANITA SINGH';
+  docs[1].fullName = 'ANITA KUMARI SINGH';
+  const ids = prepareComparison(preset.purpose, docs).documents.map((d) => d.doc_type);
+  const response: BackendCompareResponse = {
+    summary: { status: 'mismatches_found', counts: { blocking: 0, risky: 1, cosmetic: 0 } },
+    findings: [{ field: 'name', kind: 'missing_token', severity: 'risky', docs: ids,
+      values: {}, explanation: 'x', rule_ids: [] }],
+    fix_plan: [], guidance: [], disclaimer: 'd',
+  };
+  const values = toComparisonReport(response, docs, preset.purpose, 0)
+    .fields.find((field) => field.field === 'fullName')!.values;
+  assert.equal(values[0].diffSegments, undefined); // the reference value itself
+  assert.deepEqual(values[1].diffSegments, [
+    { text: 'ANITA ', isDiff: false }, { text: 'KUMARI ', isDiff: true }, { text: 'SINGH', isDiff: false },
+  ]);
+});

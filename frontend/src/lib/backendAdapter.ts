@@ -1,3 +1,4 @@
+import { diffChars } from './diff';
 import type {
   CitizenDocument,
   ComparisonReport,
@@ -189,18 +190,31 @@ function buildFields(
       summary = [...new Set(fieldFindings.map((finding) => finding.explanation))].join(' ');
     }
 
+    // Character-level diff of each flagged value against the first document that has a value
+    // (same reference point as the pre-merge receipt report).
+    const baselineIndex = documents.findIndex((document) => fieldValue(document, field).trim());
+    const baseline = baselineIndex >= 0 ? fieldValue(documents[baselineIndex], field).trim() : '';
+
     return {
       field,
       label: FIELD_LABELS[field],
       severity,
       summary,
-      values: documents.map((document, index) => ({
-        docId: document.id,
-        docLabel: document.label,
-        shortCode: document.shortCode,
-        rawValue: fieldValue(document, field) || 'Not provided',
-        isOutlier: actionableDocs.has(backendIds[index]),
-      })),
+      values: documents.map((document, index) => {
+        const raw = fieldValue(document, field);
+        const isOutlier = actionableDocs.has(backendIds[index]);
+        return {
+          docId: document.id,
+          docLabel: document.label,
+          shortCode: document.shortCode,
+          rawValue: raw || 'Not provided',
+          isOutlier,
+          diffSegments:
+            isOutlier && index !== baselineIndex && baseline && raw.trim() && raw.trim() !== baseline
+              ? diffChars(baseline, raw.trim()).map((seg) => ({ text: seg.text, isDiff: !seg.same }))
+              : undefined,
+        };
+      }),
     };
   });
 }
